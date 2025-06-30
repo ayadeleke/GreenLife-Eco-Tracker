@@ -92,7 +92,7 @@ npm test
 
 ## 📋 Project Management
 
-- [GitHub Project Board](https://github.com/YOUR-USERNAME/greenlife-eco-tracker/projects/1)  
+- [GitHub Project Board](https://github.com/aytreasure/greenlife-eco-tracker/projects/1)  
   Tracks all user stories, tasks, and milestones.  
   Issues are linked to PRs and moved across columns as work progresses.
 
@@ -128,14 +128,14 @@ This project is licensed under the MIT License.
 
 ## 👤 Authors
 
-- [Your Name](https://github.com/YOUR-USERNAME)
+- [Ayotunde Adeleke](https://github.com/aytreasure)
 - [Contributors](https://github.com/YOUR-USERNAME/greenlife-eco-tracker/graphs/contributors)
 
 ---
 
 ## 📞 Support
 
-For questions or support, please open an issue on [GitHub Issues](https://github.com/YOUR-USERNAME/greenlife-eco-tracker/issues).
+For questions or support, please open an issue on [GitHub Issues](https://github.com/aytreasure/greenlife-eco-tracker/issues).
 
 ---
 

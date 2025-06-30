@@ -129,7 +129,7 @@ This project is licensed under the MIT License.
 ## 👤 Authors
 
 - [Ayotunde Adeleke](https://github.com/aytreasure)
-- [Contributors](https://github.com/YOUR-USERNAME/greenlife-eco-tracker/graphs/contributors)
+- [Contributors](https://github.com/aytreasure/greenlife-eco-tracker/graphs/contributors)
 
 ---
 

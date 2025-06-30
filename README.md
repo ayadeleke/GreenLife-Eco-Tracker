@@ -34,7 +34,7 @@ The project is designed with professional software engineering practices, includ
 ### 1. Clone the Repository
 
 ```sh
-git clone https://github.com/ay_treasure/greenlife-eco-tracker.git
+git clone https://github.com/ayadeleke/greenlife-eco-tracker.git
 cd greenlife-eco-tracker
 ```
 
@@ -92,7 +92,7 @@ npm test
 
 ## 📋 Project Management
 
-- [GitHub Project Board](https://github.com/ay_treasure/greenlife-eco-tracker/projects/1)  
+- [GitHub Project Board](https://github.com/ayadeleke/greenlife-eco-tracker/projects/1)  
   Tracks all user stories, tasks, and milestones.  
   Issues are linked to PRs and moved across columns as work progresses.
 
@@ -128,14 +128,14 @@ This project is licensed under the MIT License.
 
 ## 👤 Authors
 
-- [Ayotunde Adeleke](https://github.com/ay_treasure)
-- [Contributors](https://github.com/ay_treasure/greenlife-eco-tracker/graphs/contributors)
+- [Ayotunde Adeleke](https://github.com/ayadeleke)
+- [Contributors](https://github.com/ayadeleke/greenlife-eco-tracker/graphs/contributors)
 
 ---
 
 ## 📞 Support
 
-For questions or support, please open an issue on [GitHub Issues](https://github.com/ay_treasure/greenlife-eco-tracker/issues).
+For questions or support, please open an issue on [GitHub Issues](https://github.com/ayadeleke/greenlife-eco-tracker/issues).
 
 ---
 

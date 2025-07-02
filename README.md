@@ -83,6 +83,14 @@ npm test
 
 ---
 
+
+## Screenshots
+![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+
+![image](https://github.com/user-attachments/assets/dec0ebf6-7f75-4630-a06e-587087cd56a1)
+
+---
+
 ## 🛠️ Continuous Integration
 
 - All Pull Requests trigger the CI pipeline (GitHub Actions).

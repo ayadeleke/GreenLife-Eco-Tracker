@@ -15,7 +15,7 @@ const GlobalTreeCountControl: React.FC<GlobalTreeCountControlProps> = ({ species
 
     // Fetch available species for the filter dropdown (only once)
     useEffect(() => {
-        axios.get('http://127.0.0.1:8000/api/trees/')
+        axios.get('http://134.149.216.180:8000/api/trees/')
             .then(res => {
                 const allSpecies = res.data.results
                     ? res.data.results.map((tree: any) => tree.species)
@@ -27,7 +27,7 @@ const GlobalTreeCountControl: React.FC<GlobalTreeCountControlProps> = ({ species
 
     // Fetch count based on selected species (every time species changes)
     useEffect(() => {
-        let url = 'http://127.0.0.1:8000/api/trees/';
+        let url = 'http://134.149.216.180:8000/api/trees/';
         if (species !== 'All') url += `?species=${encodeURIComponent(species)}`;
 
         axios.get(url)

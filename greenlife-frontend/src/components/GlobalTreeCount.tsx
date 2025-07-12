@@ -6,7 +6,7 @@ const GlobalTreeCount: React.FC = () => {
     const [count, setCount] = useState<number>(0);
 
     useEffect(() => {
-        axios.get('http://127.0.0.1:8000/api/trees/')
+        axios.get('http://134.149.216.180:8000/api/trees/')
             .then(res => {
                 // If paginated, use count; else, use length
                 setCount(res.data.count ?? res.data.length ?? 0);

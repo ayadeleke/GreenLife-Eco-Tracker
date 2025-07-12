@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000/api/trees/';
+const API_URL = 'http://134.149.216.180:8000/api/trees/';
 
 export const fetchTrees = () => axios.get(API_URL);
 export const fetchGeoJson = () => axios.get(`${API_URL}geojson/`);

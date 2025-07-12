@@ -75,7 +75,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onLocationSelect }) => {
     const center: [number, number] = [0, 0];
 
     useEffect(() => {
-        let url = 'http://127.0.0.1:8000/api/trees/';
+        let url = 'http://134.149.216.180:8000/api/trees/';
         if (species !== 'All') url += `?species=${encodeURIComponent(species)}`;
         axios.get(url)
             .then(res => setTrees(res.data.results || res.data));

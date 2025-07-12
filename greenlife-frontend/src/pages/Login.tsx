@@ -13,7 +13,7 @@ const Login: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://127.0.0.1:8000/api/login/', { username, password });
+            const res = await axios.post('http://134.149.216.180:8000/api/login/', { username, password });
             setToken(res.data.access, res.data.user); // Make sure res.data.user is { username: "..." }
             navigate('/dashboard');
         } catch {

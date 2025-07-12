@@ -15,7 +15,7 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         if (token) {
-            axios.get('http://127.0.0.1:8000/api/trees/my_stats/', {
+            axios.get('http://134.149.216.180:8000/api/trees/my_stats/', {
                 headers: { Authorization: `Bearer ${token}` },
             }).then(res => setStats(res.data));
         }

@@ -1,8 +1,7 @@
 import axios from 'axios';
+import { API_CONFIG, buildApiUrl } from '../config/api';
 
-const API_URL = 'http://134.149.216.180:8000/api/trees/';
-
-export const fetchTrees = () => axios.get(API_URL);
-export const fetchGeoJson = () => axios.get(`${API_URL}geojson/`);
+export const fetchTrees = () => axios.get(buildApiUrl(API_CONFIG.ENDPOINTS.TREES));
+export const fetchGeoJson = () => axios.get(buildApiUrl(API_CONFIG.ENDPOINTS.GEOJSON));
 export const createTree = (data: any, token: string) =>
-    axios.post(API_URL, data, { headers: { Authorization: `Bearer ${token}` } });
+    axios.post(buildApiUrl(API_CONFIG.ENDPOINTS.TREES), data, { headers: { Authorization: `Bearer ${token}` } });

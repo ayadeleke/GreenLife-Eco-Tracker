@@ -27,9 +27,43 @@ SECRET_KEY = config("DJANGO_SECRET_KEY", default="insecure-default-key-for-build
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = os.getenv("DEBUG", "False") == "True"
+
 DEBUG = True
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+# Parse ALLOWED_HOSTS from environment variable
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
+
+# Security settings for development
+if DEBUG:
+    # Development settings - explicitly disable HTTPS and security features
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    SECURE_BROWSER_XSS_FILTER = False
+    # Remove any proxy SSL headers in development
+    SECURE_PROXY_SSL_HEADER = None
+else:
+    # Production settings - enable HTTPS and security features
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Cookie security - only in production
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Additional security headers
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+
+    # Azure proxy support
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
@@ -78,8 +112,22 @@ TEMPLATES = [
     },
 ]
 
-# Allow frontend requests
-CORS_ALLOW_ALL_ORIGINS = True
+# Allow frontend requests - configure more strictly for production
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React dev server
+    "http://127.0.0.1:3000",  # React dev server alternative
+    "http://localhost:80",    # Frontend container
+    "http://127.0.0.1:80",    # Frontend container alternative
+    "http://134.149.216.180:3000",  # Production frontend
+    "https://greenlifefrontend-gcc7aafsbqewd7d4.germanywestcentral-01.azurewebsites.net",
+]
+
+# In production, you should specify exact origins
+CORS_ALLOW_CREDENTIALS = True
+
+# For development only - remove in production
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = "config.wsgi.application"
 
@@ -96,7 +144,7 @@ DATABASES = {
         "HOST": config("DB_HOST", default="localhost"),  # Dummy default
         "PORT": config("DB_PORT", default="3306"),  # Default Port
         "TEST": {
-            "NAME": "freedb_greenlife_db",
+            "NAME": "test_greenlife_db",  # Use a different name for testing
             "MIRROR": None,
         },
         "OPTIONS": {
@@ -159,6 +207,11 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+# Additional static files directories for development
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+] if DEBUG else []
 
 # Media files
 MEDIA_URL = "/media/"

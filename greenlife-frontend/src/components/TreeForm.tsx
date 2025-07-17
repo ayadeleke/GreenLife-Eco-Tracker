@@ -44,6 +44,7 @@ const TreeForm: React.FC<TreeFormProps> = ({ token, onSuccess, latitude, longitu
                 formData.append('photo', photo);
             }
             await createTree(formData, token); // Pass FormData and token only
+            alert('Thank you for contributing, tree added successfully!');
             onSuccess();
         } catch (err: any) {
             alert(err.response?.data?.detail || 'Error adding tree');

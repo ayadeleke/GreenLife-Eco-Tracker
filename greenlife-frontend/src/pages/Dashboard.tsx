@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Container, Typography, List, ListItem, ListItemText, Paper, Button, Divider, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { API_CONFIG, buildApiUrl } from '../config/api';
 
 const Dashboard: React.FC = () => {
     const { token, setToken } = useAuth();
@@ -15,7 +16,7 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         if (token) {
-            axios.get('http://134.149.216.180:8000/api/trees/my_stats/', {
+            axios.get(buildApiUrl(API_CONFIG.ENDPOINTS.MY_STATS), {
                 headers: { Authorization: `Bearer ${token}` },
             }).then(res => setStats(res.data));
         }

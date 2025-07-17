@@ -5,7 +5,9 @@ import axios from 'axios';
 import { OpenStreetMapProvider, GeoSearchControl } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 import GlobalTreeCountControl from './GlobalTreeCountControl';
+import LoadingSpinner from './LoadingSpinner';
 import treeIconUrl from '../assets/tree-icon.png';
+import { API_CONFIG, buildApiUrl } from '../config/api';
 
 const treeIcon = new L.Icon({
     iconUrl: treeIconUrl,
@@ -69,16 +71,29 @@ const LocationPicker: React.FC<{ onLocationSelect: (lat: number, lng: number, ad
 
 const TreeMap: React.FC<TreeMapProps> = ({ onLocationSelect }) => {
     const [trees, setTrees] = useState<any[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
     const [pickedLocation, setPickedLocation] = useState<[number, number] | null>(null);
     const [pickedAddress, setPickedAddress] = useState<string>('');
     const [species, setSpecies] = useState('All');
     const center: [number, number] = [0, 0];
 
     useEffect(() => {
-        let url = 'http://134.149.216.180:8000/api/trees/';
-        if (species !== 'All') url += `?species=${encodeURIComponent(species)}`;
-        axios.get(url)
-            .then(res => setTrees(res.data.results || res.data));
+        const fetchTrees = async () => {
+            setLoading(true);
+            try {
+                let url = buildApiUrl(API_CONFIG.ENDPOINTS.TREES);
+                if (species !== 'All') url += `?species=${encodeURIComponent(species)}`;
+                const response = await axios.get(url);
+                setTrees(response.data.results || response.data);
+            } catch (error) {
+                console.error('Error fetching trees:', error);
+                setTrees([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTrees();
     }, [species]);
 
     // Handler for both search and click
@@ -108,6 +123,7 @@ const TreeMap: React.FC<TreeMapProps> = ({ onLocationSelect }) => {
 
     return (
         <div style={{ position: 'relative' }}>
+            <LoadingSpinner show={loading} message="Loading Map..." />
             <button
                 style={{
                     position: 'absolute',

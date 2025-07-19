@@ -10,9 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from decouple import config
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,13 +24,83 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config("DJANGO_SECRET_KEY")
+SECRET_KEY = config("DJANGO_SECRET_KEY", default="insecure-default-key-for-build")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", default="False", cast=bool)
 
-ALLOWED_HOSTS = []
+# Parse ALLOWED_HOSTS from environment variable
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
 
+# Cache configuration for better performance
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 20,
+                "retry_on_timeout": True,
+                "health_check_interval": 30,
+            },
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,
+        },
+        "TIMEOUT": 600,  # 10 minutes
+        "KEY_PREFIX": "greenlife",
+        "VERSION": 1,
+    }
+}
+
+# Fallback to in-memory cache if Redis is not available
+if not config("REDIS_URL", default=None):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+            "TIMEOUT": 600,  # 10 minutes
+            "OPTIONS": {
+                "MAX_ENTRIES": 1000,
+                "CULL_FREQUENCY": 3,
+            },
+        }
+    }
+
+# Cache sessions in database for better performance
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_CACHE_ALIAS = "default"
+if DEBUG:
+    # Development settings - explicitly disable HTTPS and security features
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    SECURE_BROWSER_XSS_FILTER = False
+    # Remove any proxy SSL headers in development
+    SECURE_PROXY_SSL_HEADER = None
+else:
+    # Production settings - enable HTTPS and security features
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Cookie security - only in production
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Additional security headers
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = "DENY"
+
+    # Azure proxy support
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
 
@@ -49,6 +121,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -56,6 +129,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 ROOT_URLCONF = "config.urls"
 
@@ -74,8 +149,23 @@ TEMPLATES = [
     },
 ]
 
-# Allow frontend requests
-CORS_ALLOW_ALL_ORIGINS = True
+# Allow frontend requests - configure more strictly for production
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React dev server
+    "http://127.0.0.1:3000",  # React dev server alternative
+    "http://localhost:80",  # Frontend container
+    "http://127.0.0.1:80",  # Frontend container alternative
+    "http://134.149.216.180:3000",  # Production frontend
+    "https://greenlifefrontend-gcc7aafsbqewd7d4.germanywestcentral-01.azurewebsites.net",
+    "https://greengoal.azurewebsites.net",
+]
+
+# In production, you should specify exact origins
+CORS_ALLOW_CREDENTIALS = True
+
+# For development only - remove in production
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = "config.wsgi.application"
 
@@ -86,14 +176,24 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": config("DB_NAME"),
-        "USER": config("DB_USER"),
-        "PASSWORD": config("DB_PASSWORD"),
-        "HOST": config("DB_HOST", default="127.0.0.1"),
-        "PORT": config("DB_PORT", default="3306"),
+        "NAME": config("DB_NAME", default="mydatabase"),  # Dummy default
+        "USER": config("DB_USER", default="myuser"),  # Dummy default
+        "PASSWORD": config("DB_PASSWORD", default="mypassword"),  # Dummy default
+        "HOST": config("DB_HOST", default="localhost"),  # Dummy default
+        "PORT": config("DB_PORT", default="3306"),  # Default Port
+        "TEST": {
+            "NAME": "test_greenlife_db",  # Use a different name for testing
+            "MIRROR": None,
+        },
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            "charset": "utf8mb4",
+            "sql_mode": "STRICT_TRANS_TABLES",
         },
+        # Connection pooling and optimization
+        "CONN_MAX_AGE": 600,  # Keep connections alive for 10 minutes
+        "CONN_HEALTH_CHECKS": True,  # Check connection health
+        "ATOMIC_REQUESTS": True,  # Wrap each view in a transaction
     }
 }
 
@@ -124,11 +224,11 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 100,
+    "PAGE_SIZE": 100000,  # Set a large page size for map data
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),  # 1 hour
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),  # 1 day
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # 7 days
     "ROTATE_REFRESH_TOKENS": True,
 }
@@ -149,12 +249,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
-MEDIA_ROOT = BASE_DIR / "media"
+# Additional static files directories for development
+STATICFILES_DIRS = (
+    [
+        os.path.join(BASE_DIR, "static"),
+    ]
+    if DEBUG
+    else []
+)
 
+# Media files
 MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
+if "test" in sys.argv:
+    SECURE_SSL_REDIRECT = False
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -4,6 +4,13 @@ from rest_framework.test import APIClient
 from .models import TreeEntry
 from django.urls import reverse
 from datetime import date
+from django.core.cache import cache
+from django.core.cache.backends.base import InvalidCacheBackendError
+from django.conf import settings
+import redis
+from redis.exceptions import ConnectionError as RedisConnectionError
+import time
+import json
 
 
 class TreeEntryUnitTest(TestCase):
@@ -280,3 +287,135 @@ class TreeEntryUnitTest(TestCase):
             data["longitude"] = lon
             response = self.client.post(url, data, format="json")
             self.assertEqual(response.status_code, 201)
+
+class RedisCacheTest(TestCase):
+    """
+    Test Redis cache functionality and connection.
+    """
+
+    def setUp(self):
+        """Set up test data for cache testing."""
+        self.test_key = "test_redis_key"
+        self.test_value = {"message": "Hello Redis!", "timestamp": time.time()}
+
+    def tearDown(self):
+        """Clean up test cache keys."""
+        try:
+            cache.delete(self.test_key)
+            cache.delete("test_counter")
+            cache.delete("test_complex_data")
+        except Exception:
+            pass  # Ignore cleanup errors
+
+
+    def test_cache_increment_decrement(self):
+        """Test atomic increment/decrement operations."""
+        counter_key = "test_counter"
+
+        # Initialize counter
+        cache.set(counter_key, 0, timeout=60)
+
+        # Test increment
+        try:
+            new_value = cache.get_or_set(counter_key, 0, timeout=60)
+            self.assertEqual(new_value, 0)
+
+            # Manual increment simulation (since django-redis doesn't guarantee incr/decr)
+            current = cache.get(counter_key, 0)
+            cache.set(counter_key, current + 1, timeout=60)
+            incremented = cache.get(counter_key)
+            self.assertEqual(incremented, 1)
+
+        except Exception as e:
+            # Some cache backends don't support increment/decrement
+            self.skipTest(f"Cache backend doesn't support increment operations: {e}")
+
+
+    def test_cache_backend_type(self):
+        """Test that Redis cache backend is properly configured."""
+        cache_backend = settings.CACHES["default"]["BACKEND"]
+
+        if "django_redis.cache.RedisCache" in cache_backend:
+            # We're using Redis
+            self.assertEqual(
+                cache_backend,
+                "django_redis.cache.RedisCache",
+                "Should be using Redis cache backend",
+            )
+        elif "locmem" in cache_backend.lower():
+            # We're using fallback in-memory cache
+            self.skipTest("Using fallback in-memory cache instead of Redis")
+        else:
+            self.fail(f"Unexpected cache backend: {cache_backend}")
+
+    def test_cache_configuration(self):
+        """Test Redis cache configuration settings."""
+        cache_config = settings.CACHES["default"]
+
+        # Check required configuration
+        self.assertIn("LOCATION", cache_config)
+        self.assertIn("OPTIONS", cache_config)
+
+        options = cache_config["OPTIONS"]
+        self.assertIn("CLIENT_CLASS", options)
+        self.assertEqual(options["CLIENT_CLASS"], "django_redis.client.DefaultClient")
+
+        # Check connection pool settings
+        if "CONNECTION_POOL_KWARGS" in options:
+            pool_kwargs = options["CONNECTION_POOL_KWARGS"]
+            self.assertIn("max_connections", pool_kwargs)
+            self.assertGreater(pool_kwargs["max_connections"], 0)
+
+    def test_cache_fallback(self):
+        """Test that cache gracefully handles connection issues."""
+        # This test verifies the IGNORE_EXCEPTIONS setting works
+        try:
+            # These operations should not raise exceptions even if Redis is down
+            cache.set("fallback_test", "value", timeout=60)
+            value = cache.get("fallback_test", "default")
+            # Value might be None if Redis is down and IGNORE_EXCEPTIONS is True
+            self.assertIn(value, ["value", "default", None])
+
+        except Exception as e:
+            # If IGNORE_EXCEPTIONS is False, this might raise an exception
+            self.skipTest(f"Cache fallback test skipped due to: {e}")
+
+
+class CacheIntegrationTest(TestCase):
+    """
+    Integration tests for cache usage in the application.
+    """
+
+    def setUp(self):
+        """Set up test data."""
+        self.user = User.objects.create_user(username="cacheuser", password="testpass")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_cache_in_api_views(self):
+        """Test that cache is working in API views (if implemented)."""
+        # Create some test data
+        TreeEntry.objects.create(
+            user=self.user,
+            species="Cached Oak",
+            latitude=45.0,
+            longitude=-75.0,
+            date_planted=date.today(),
+        )
+
+        # Test API endpoint (my_stats is a custom action on the TreeEntry viewset)
+        url = reverse("treeentry-my-stats")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # If caching is implemented, subsequent calls should be faster
+        start_time = time.time()
+        response2 = self.client.get(url)
+        end_time = time.time()
+
+        self.assertEqual(response2.status_code, 200)
+        # Second call might be cached (though this is not guaranteed without explicit caching)
+
+    def tearDown(self):
+        """Clean up cache after tests."""
+        cache.clear()

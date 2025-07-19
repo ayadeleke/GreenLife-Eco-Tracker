@@ -83,6 +83,90 @@ npm test
 
 ---
 
+## 🚀 Local Setup Instructions (Docker-Based)
+### Prerequisites
+- In addition to the above stated prerequisites, the following I required to run this project base on Docker:
+- [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
+- [Git](https://git-scm.com/)
+- [Redis](https://redis.io/download) (optional, for caching)
+
+#### 1. Clone the Repository
+
+```sh
+git clone https://github.com/ayadeleke/greenlife-eco-tracker.git
+```
+
+#### 2. Set up Environment Variables
+
+```sh
+# Create an environment variable at the root of the project using the .example in the project
+echo .env
+# Copy environment configuration
+cp .env.example .env
+
+# Edit the .env file with your configuration
+# For Docker setup, you can use the default values
+```
+
+#### 3. Run with Docker Compose
+
+```sh
+# Start all services (backend + frontend)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+The application will be available at:
+- **Frontend**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:8000](http://localhost:8000)
+- **API Documentation**: [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/)
+
+#### 4. Database Setup (If this is your first time running this project)
+
+##### NOTE: For this project I used MySQL but you are free to use any database of your choice
+
+```sh
+# Run database migrations
+docker-compose exec backend python manage.py makemigrations &&
+docker-compose exec backend python manage.py migrate
+
+# Create a superuser (optional)
+docker-compose exec backend python manage.py createsuperuser
+```
+#### Local Setup Instructions (Docker-Based)
+##### Using Pre-built Images from Docker Hub
+
+###### Running Containers Independently
+
+```sh
+# 1. Pull the images from Docker Hub
+docker pull aytreasure/greenlife-backend:latest
+docker pull aytreasure/greenlife-frontend:latest
+
+# 2. Run the backend container
+docker run -d \
+  --name greenlife-backend \
+  --env-file .env \
+  -p 8000:8000 \
+  aytreasure/greenlife-backend:latest
+
+# 3. Run the frontend container
+docker run -d \
+  --name greenlife-frontend \
+  --env-file .env \
+  -p 3000:80 \
+  aytreasure/greenlife-frontend:latest
+
+# 4. Check running containers
+docker ps
+```
+
+---
 
 ## Screenshots
 ![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
@@ -101,7 +185,7 @@ npm test
 
 ## 📋 Project Management
 
-- [GitHub Project Board](https://github.com/ayadeleke/greenlife-eco-tracker/projects/1)  
+- [Azure Project Board](https://dev.azure.com/ay-alu/GreenLife%20Eco%20Tracker/_boards/board/t/GreenLife%20Eco%20Tracker%20Team/Epics)  
   Tracks all user stories, tasks, and milestones.  
   Issues are linked to PRs and moved across columns as work progresses.
 
@@ -111,11 +195,26 @@ npm test
 
 ```
 greenlife-eco-tracker/
-├── greenlife-backend/    # Django REST API
-├── greenlife-frontend/   # React/TypeScript frontend
-├── .github/              # GitHub Actions workflows
-├── README.md
-└── ...
+├── greenlife_backend/       # Django REST API
+│   ├── Dockerfile          # Backend container configuration
+│   ├── requirements.txt    # Python dependencies
+│   ├── manage.py          # Django management script
+│   ├── config/            # Django settings and configuration
+│   └── tracker/           # Main application logic
+├── greenlife-frontend/     # React/TypeScript frontend
+│   ├── Dockerfile         # Frontend container configuration
+│   ├── nginx.conf         # Nginx configuration for production
+│   ├── package.json       # Node.js dependencies
+│   ├── src/               # React source code
+│   └── public/            # Static assets
+├── terraform/             # Infrastructure as Code
+│   └── main.tf           # Azure resource definitions
+├── .github/               # GitHub Actions workflows
+│   └── workflows/        # CI/CD pipeline definitions
+├── docker-compose.yml     # Multi-container orchestration
+├── .env.example          # Environment variables template
+├── phase.md              # Project phase completion report
+└── README.md             # Project documentation
 ```
 
 ---

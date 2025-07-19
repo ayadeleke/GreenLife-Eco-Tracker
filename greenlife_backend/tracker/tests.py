@@ -357,7 +357,9 @@ class CacheIntegrationTest(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        self.user = User.objects.create_user(username="cacheuser", password="testpass")   # nosec
+        self.user = User.objects.create_user(
+            username="cacheuser", password="testpass"
+        )  # nosec
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 

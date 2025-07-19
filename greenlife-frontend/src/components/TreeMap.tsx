@@ -233,10 +233,11 @@ const TreeMap: React.FC<TreeMapProps> = ({
                             <Popup>
                                 <b>{tree.species}</b>
                                 <br />
+                                Coordinates: {`${tree.latitude.toFixed(4)}, ${tree.longitude.toFixed(4)}`}
+                                <br />
                                 Planted: {tree.date_planted}
                                 <br />
                                 By: {tree.user}
-                                <br />
                             </Popup>
                         </Marker>
                     ))}

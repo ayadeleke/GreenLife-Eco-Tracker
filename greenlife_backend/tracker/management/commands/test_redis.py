@@ -8,7 +8,6 @@ from django.conf import settings
 import redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 import time
-import json
 
 
 class Command(BaseCommand):

@@ -10,7 +10,6 @@ class TreeEntry(models.Model):
     date_planted = models.DateField(db_index=True)
     photo = models.ImageField(upload_to="tree_photos/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    description = models.TextField(blank=True, null=True)
 
     class Meta:
         indexes = [

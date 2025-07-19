@@ -9,11 +9,8 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.core.cache import cache
-from django.utils.decorators import method_decorator
-from django.db.models import Count, Q
-from django.db import connection
+from django.db.models import Count
 import logging
-import time
 
 # Set up logging for cache debugging
 logger = logging.getLogger(__name__)
@@ -126,7 +123,7 @@ class TreeEntryViewSet(viewsets.ModelViewSet):
 
         # Use values() for better performance
         trees = queryset.values(
-            "id", "species", "latitude", "longitude", "date_planted", "description"
+            "id", "species", "latitude", "longitude", "date_planted"
         )
 
         features = []
@@ -146,7 +143,6 @@ class TreeEntryViewSet(viewsets.ModelViewSet):
                             "id": tree["id"],
                             "species": tree["species"],
                             "date_planted": tree["date_planted"],
-                            "description": tree["description"],
                         },
                     }
                 )
@@ -194,11 +190,6 @@ class TreeEntryViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, stats, 120)
 
         return Response(stats)
-
-    def clear_list_cache(self):
-        """Clear all variations of the list cache by incrementing version"""
-        new_version = self.increment_cache_version()
-        logger.info(f"Invalidated all tree list caches, new version: {new_version}")
 
     def perform_create(self, serializer):
         """Clear cache when creating new tree"""

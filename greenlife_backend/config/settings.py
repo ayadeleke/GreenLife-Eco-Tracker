@@ -26,14 +26,50 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="insecure-default-key-for-build")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = os.getenv("DEBUG", "False") == "True"
-
-DEBUG = True
+DEBUG = config("DEBUG", default="False", cast=bool)
 
 # Parse ALLOWED_HOSTS from environment variable
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
 
-# Security settings for development
+# Cache configuration for better performance
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 20,
+                "retry_on_timeout": True,
+                "health_check_interval": 30,
+            },
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,
+        },
+        "TIMEOUT": 600,  # 10 minutes
+        "KEY_PREFIX": "greenlife",
+        "VERSION": 1,
+    }
+}
+
+# Fallback to in-memory cache if Redis is not available
+if not config("REDIS_URL", default=None):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+            "TIMEOUT": 600,  # 10 minutes
+            "OPTIONS": {
+                "MAX_ENTRIES": 1000,
+                "CULL_FREQUENCY": 3,
+            },
+        }
+    }
+
+# Cache sessions in database for better performance
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_CACHE_ALIAS = "default"
 if DEBUG:
     # Development settings - explicitly disable HTTPS and security features
     SECURE_SSL_REDIRECT = False
@@ -60,10 +96,10 @@ else:
     # Additional security headers
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
-    X_FRAME_OPTIONS = 'DENY'
+    X_FRAME_OPTIONS = "DENY"
 
     # Azure proxy support
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
 
@@ -116,10 +152,11 @@ TEMPLATES = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev server
     "http://127.0.0.1:3000",  # React dev server alternative
-    "http://localhost:80",    # Frontend container
-    "http://127.0.0.1:80",    # Frontend container alternative
+    "http://localhost:80",  # Frontend container
+    "http://127.0.0.1:80",  # Frontend container alternative
     "http://134.149.216.180:3000",  # Production frontend
     "https://greenlifefrontend-gcc7aafsbqewd7d4.germanywestcentral-01.azurewebsites.net",
+    "https://greengoal.azurewebsites.net",
 ]
 
 # In production, you should specify exact origins
@@ -149,7 +186,13 @@ DATABASES = {
         },
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            "charset": "utf8mb4",
+            "sql_mode": "STRICT_TRANS_TABLES",
         },
+        # Connection pooling and optimization
+        "CONN_MAX_AGE": 600,  # Keep connections alive for 10 minutes
+        "CONN_HEALTH_CHECKS": True,  # Check connection health
+        "ATOMIC_REQUESTS": True,  # Wrap each view in a transaction
     }
 }
 
@@ -180,7 +223,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 100,
+    "PAGE_SIZE": 100000,  # Set a large page size for map data
 }
 
 SIMPLE_JWT = {
@@ -209,9 +252,13 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Additional static files directories for development
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-] if DEBUG else []
+STATICFILES_DIRS = (
+    [
+        os.path.join(BASE_DIR, "static"),
+    ]
+    if DEBUG
+    else []
+)
 
 # Media files
 MEDIA_URL = "/media/"

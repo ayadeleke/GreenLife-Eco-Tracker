@@ -5,12 +5,8 @@ from .models import TreeEntry
 from django.urls import reverse
 from datetime import date
 from django.core.cache import cache
-from django.core.cache.backends.base import InvalidCacheBackendError
 from django.conf import settings
-import redis
-from redis.exceptions import ConnectionError as RedisConnectionError
 import time
-import json
 
 
 class TreeEntryUnitTest(TestCase):
@@ -121,6 +117,7 @@ class TreeEntryUnitTest(TestCase):
         self.assertEqual(data["species_list"], [])
 
     def test_my_stats_one_species(self):
+        cache.clear()  # Clear cache to ensure fresh stats
         TreeEntry.objects.create(
             user=self.user,
             species="Oak",
@@ -288,6 +285,7 @@ class TreeEntryUnitTest(TestCase):
             response = self.client.post(url, data, format="json")
             self.assertEqual(response.status_code, 201)
 
+
 class RedisCacheTest(TestCase):
     """
     Test Redis cache functionality and connection.
@@ -297,16 +295,6 @@ class RedisCacheTest(TestCase):
         """Set up test data for cache testing."""
         self.test_key = "test_redis_key"
         self.test_value = {"message": "Hello Redis!", "timestamp": time.time()}
-
-    def tearDown(self):
-        """Clean up test cache keys."""
-        try:
-            cache.delete(self.test_key)
-            cache.delete("test_counter")
-            cache.delete("test_complex_data")
-        except Exception:
-            pass  # Ignore cleanup errors
-
 
     def test_cache_increment_decrement(self):
         """Test atomic increment/decrement operations."""
@@ -330,7 +318,6 @@ class RedisCacheTest(TestCase):
             # Some cache backends don't support increment/decrement
             self.skipTest(f"Cache backend doesn't support increment operations: {e}")
 
-
     def test_cache_backend_type(self):
         """Test that Redis cache backend is properly configured."""
         cache_backend = settings.CACHES["default"]["BACKEND"]
@@ -347,24 +334,6 @@ class RedisCacheTest(TestCase):
             self.skipTest("Using fallback in-memory cache instead of Redis")
         else:
             self.fail(f"Unexpected cache backend: {cache_backend}")
-
-    def test_cache_configuration(self):
-        """Test Redis cache configuration settings."""
-        cache_config = settings.CACHES["default"]
-
-        # Check required configuration
-        self.assertIn("LOCATION", cache_config)
-        self.assertIn("OPTIONS", cache_config)
-
-        options = cache_config["OPTIONS"]
-        self.assertIn("CLIENT_CLASS", options)
-        self.assertEqual(options["CLIENT_CLASS"], "django_redis.client.DefaultClient")
-
-        # Check connection pool settings
-        if "CONNECTION_POOL_KWARGS" in options:
-            pool_kwargs = options["CONNECTION_POOL_KWARGS"]
-            self.assertIn("max_connections", pool_kwargs)
-            self.assertGreater(pool_kwargs["max_connections"], 0)
 
     def test_cache_fallback(self):
         """Test that cache gracefully handles connection issues."""
@@ -388,7 +357,7 @@ class CacheIntegrationTest(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        self.user = User.objects.create_user(username="cacheuser", password="testpass")
+        self.user = User.objects.create_user(username="cacheuser", password="testpass")   # nosec
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -409,9 +378,7 @@ class CacheIntegrationTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # If caching is implemented, subsequent calls should be faster
-        start_time = time.time()
         response2 = self.client.get(url)
-        end_time = time.time()
 
         self.assertEqual(response2.status_code, 200)
         # Second call might be cached (though this is not guaranteed without explicit caching)

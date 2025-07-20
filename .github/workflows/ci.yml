@@ -1,9 +1,6 @@
 name: GreenLife_CI
 
 on:
-  push:
-    branches:
-      - develop
   pull_request:
     branches:
       - main

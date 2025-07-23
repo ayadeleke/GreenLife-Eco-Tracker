@@ -1,3 +1,20 @@
+# Terraform
 .terraform/
 .terraform.lock.hcl
 *.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
+
+# Secrets and sensitive files
+.env
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

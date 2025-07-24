@@ -53,13 +53,12 @@ After a successful deployment of the project on azure web service, the frontend 
 
 ## **2. Peer Review Process**
 
-### **Pull Request Review Implementation**
-- **Repository**: [GreenLife-Eco-Tracker](https://github.com/ayadeleke/GreenLife-Eco-Tracker)
-- **Review Process**: The process aimed at ensuring the following:
-  -  Branch protection rules enforcing PR reviews
-  -  Required status checks before merge
-  -  Automated CI pipeline validation
-  -  Code quality and security scanning
+### **Pull Request Reviewed**
+- **Repository**: [PR Link](https://github.com/JoyOffere/Devops_Summatives/pull/49/files)
+- **Review Process**: The process is to ensure that:
+  -  Branch protection rules are enforced
+  -  Access the code structure and quality
+  -  Contribute to the project
 
 ### **Testing Infrastructure**
 - **Backend Testing**: Django unit tests with 100% coverage

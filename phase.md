@@ -78,23 +78,23 @@ After a successful deployment of the project on azure web service, the frontend 
 ## 3 **Deployment Screenshots**
 
 ### **Azure Resource Groups**
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/resource%20group.png?raw=true)
 
 ### **Azure Container Registry**
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/ACR.png?raw=true)
 
 ### **App Services Running**
 - **Backend**:
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/Backend%20Web%20App.png?raw=true)
 
 - **Frontend**:
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/a8c64e464472db27441d5ec31c540b44e9bdbf7d/screenshots/Frontend%20Web%20App.png)
 
 ### **Terraform Cloud Workspace**
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/709ec4f0b493dbaab8e7e417d20c84fa545898c7/screenshots/Terraform%20Cloud%20Resources.png)
 
 ### **Docker Hub Library**
-![image](https://github.com/user-attachments/assets/f5cf990c-efd4-40ae-bc96-bad7e0dd87be)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/Docker%20hub%20registry.png?raw=true)
 
 ---
 

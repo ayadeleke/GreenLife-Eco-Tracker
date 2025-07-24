@@ -31,42 +31,40 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     # Validate and create user
     def validate(self, attrs):
-        password = attrs["password"]
-        username = attrs["username"]
-        email = attrs["email"]
+        username = attrs.get("username")
+        email = attrs.get("email")
+        password = attrs.get("password")
+        confirm_password = attrs.get("confirm_password")
 
-        # Check for duplicate username
+        errors = {}
+
+        # Duplicate checks
         if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError(
-                {"username": "A user with that username already exists."}
-            )
+            errors["username"] = "A user with that username already exists."
 
-        # Check for duplicate email
         if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError(
-                {"email": "A user with that email already exists."}
-            )
+            errors["email"] = "A user with that email already exists."
 
-        if password != attrs["confirm_password"]:
-            raise serializers.ValidationError(
-                {"password": "Password fields didn't match."}
-            )
+        # Password checks
+        password_errors = []
+
+        if password != confirm_password:
+            password_errors.append("Passwords do not match.")
         if len(password) < 8:
-            raise serializers.ValidationError(
-                {"password": "Password must be at least 8 characters long."}
-            )
+            password_errors.append("Password must be at least 8 characters long.")
         if not re.search(r"[A-Za-z]", password):
-            raise serializers.ValidationError(
-                {"password": "Password must include at least one letter."}
-            )
+            password_errors.append("Password must include at least one letter.")
         if not re.search(r"\d", password):
-            raise serializers.ValidationError(
-                {"password": "Password must include at least one number."}
-            )
+            password_errors.append("Password must include at least one number.")
         if not re.search(r"[^A-Za-z0-9]", password):
-            raise serializers.ValidationError(
-                {"password": "Password must include at least one symbol."}
-            )
+            password_errors.append("Password must include at least one symbol.")
+
+        if password_errors:
+            errors["password"] = password_errors
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
         return attrs
 
     # Create user instance

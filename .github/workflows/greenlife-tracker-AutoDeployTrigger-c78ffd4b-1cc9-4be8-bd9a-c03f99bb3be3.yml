@@ -4,25 +4,25 @@ name: Trigger auto deployment for greenlife-tracker
 on:
   # Automatically trigger it when detected changes in repo
   push:
-    branches: 
+    branches:
       [ develop ]
     paths:
     - '**'
     - '.github/workflows/greenlife-tracker-AutoDeployTrigger-c78ffd4b-1cc9-4be8-bd9a-c03f99bb3be3.yml'
 
-  # Allow manual trigger 
-  workflow_dispatch:      
+  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       id-token: write #This is required for requesting the OIDC JWT Token
       contents: read #Required when GH token is used to authenticate with private repo
 
     steps:
       - name: Checkout to the branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2
@@ -35,14 +35,12 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           appSourcePath: ${{ github.workspace }}
-          dockerfilePath: Dockerfile # <- Adjust if it's not at root
+          dockerfilePath: greenlife_backend/Dockerfile
           registryUrl: greenlifestagingacr91ha.azurecr.io
           registryUsername: ${{ secrets.GREENLIFETRACKER_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.GREENLIFETRACKER_REGISTRY_PASSWORD }}
           containerAppName: greenlife-tracker
-          resourceGroup: Greenlifefrontend_group
-          imageToBuild: greenlifestagingacr91ha.azurecr.io/greenlife-tracker:${{ github.sha }}
+          resourceGroup: Greenlifebackend_group-a7e3
+          imageToBuild: greenlifestagingacr91ha.azurecr.io/greenlife-backendapi:${{ github.sha }}
           buildArguments: |
             NODE_ENV=production
-
-

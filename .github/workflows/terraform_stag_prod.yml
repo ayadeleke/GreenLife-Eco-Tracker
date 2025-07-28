@@ -213,18 +213,18 @@ jobs:
         with:
           terraform_version: 1.5.0
       - name: Terraform Init
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform init
       - name: Terraform Format Check
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform fmt -check
       - name: Terraform Validate
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform validate
       - name: Terraform Security Scan (tfsec)
         run: |
           curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-          tfsec ./terraform --soft-fail
+          tfsec ./terraform/terraform-web --soft-fail
 
   staging:
     name: 'Staging Deploy'

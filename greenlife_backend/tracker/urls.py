@@ -1,6 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RegisterView, TreeEntryViewSet, UserDetailView, MyTokenObtainPairView, CacheTestView
+from .views import (
+    RegisterView,
+    TreeEntryViewSet,
+    UserDetailView,
+    MyTokenObtainPairView,
+    CacheTestView,
+)
 from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )

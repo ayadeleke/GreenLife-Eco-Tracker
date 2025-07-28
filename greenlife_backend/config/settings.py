@@ -160,7 +160,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://greengoal.azurewebsites.net",
     "https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io",  # Staging frontend
     "https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io",  # Production frontend
-    
 ]
 
 # In production, you should specify exact origins

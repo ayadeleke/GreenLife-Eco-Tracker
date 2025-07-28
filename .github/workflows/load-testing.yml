@@ -69,7 +69,7 @@ jobs:
           --env USERS=$USERS \
           --env DURATION=$DURATION \
           --description "Automated load test from GitHub Actions" \
-          --query "testId" -o tsv 2>/dev/null || echo "FAILED")
+          --query "testId" -o tsv) || echo "FAILED"
         
         if [[ "$TEST_ID" == "FAILED" ]]; then
           echo "Failed to create load test"

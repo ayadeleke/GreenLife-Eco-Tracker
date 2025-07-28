@@ -30,11 +30,11 @@ resource "azurerm_container_app" "backend" {
   registry {
     server   = var.registry_server
     username = var.registry_username
-    password_secret_name = "registry-password"
+    password_secret_name = var.registry_secret_name
   }
 
   secret {
-    name  = "registry-password"
+    name  = var.registry_secret_name
     value = var.registry_password
   }
 
@@ -84,11 +84,11 @@ resource "azurerm_container_app" "frontend" {
   registry {
     server   = var.registry_server
     username = var.registry_username
-    password_secret_name = "registry-password"
+    password_secret_name = var.registry_secret_name
   }
 
   secret {
-    name  = "registry-password"
+    name  = var.registry_secret_name
     value = var.registry_password
   }
 

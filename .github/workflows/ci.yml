@@ -193,13 +193,13 @@ jobs:
           terraform_version: 1.5.0
 
       - name: Terraform Init
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform init
 
       - name: Terraform Format Check
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform fmt -check
 
       - name: Terraform Validate
-        working-directory: ./terraform
+        working-directory: ./terraform/terraform-web
         run: terraform validate

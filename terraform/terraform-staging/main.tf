@@ -136,9 +136,10 @@ module "container_apps" {
   }
 
   # Container Registry Configuration
-  registry_server   = module.container_registry.login_server
-  registry_username = module.container_registry.admin_username
-  registry_password = module.container_registry.admin_password
+  registry_server      = module.container_registry.login_server
+  registry_username    = module.container_registry.admin_username
+  registry_password    = module.container_registry.admin_password
+  registry_secret_name = "registry-password"
 
   tags = local.common_tags
 

@@ -28,6 +28,12 @@ output "container_registry_admin_username" {
   value       = module.container_registry.admin_username
 }
 
+output "container_registry_admin_password" {
+  description = "Container registry admin password"
+  value       = module.container_registry.admin_password
+  sensitive   = true
+}
+
 # Container Apps Outputs
 output "backend_app_url" {
   description = "URL of the backend application"

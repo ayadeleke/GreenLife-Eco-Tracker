@@ -13,7 +13,8 @@ class GreenLifeUser(HttpUser):
     Simulates real users browsing the GreenLife Eco Tracker React application
     """
     wait_time = between(1, 3)
-    host = "https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io"
+    # Use environment variable for host, with fallback
+    host = os.getenv('TARGET_URL', "https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io")
     timeout_duration = 90  # seconds
 
     def on_start(self):
@@ -201,6 +202,8 @@ def on_test_start(environment, **kwargs):
     """Called when the test starts"""
     print("🌱 GreenLife Eco Tracker Load Test Starting!")
     print(f"Target: {environment.host}")
+    print(f"Users: {os.getenv('USERS', 'default')}")
+    print(f"Duration: {os.getenv('DURATION', 'default')} seconds")
     print("Testing React SPA with known routes:")
     print("  - / (Homepage)")
     print("  - /dashboard")

@@ -1,0 +1,36 @@
+# Azure Load Testing Configuration
+testName: greenlife-load-test
+description: Load test for GreenLife Eco Tracker application
+engineInstances: 1
+
+testPlan: locustfile.py
+
+# Environment variables that will be passed to the test
+env:
+  - name: TARGET_URL
+    value: "https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io"
+  - name: USERS
+    value: "50"
+  - name: DURATION
+    value: "300"
+  - name: ENABLE_LOGGING
+    value: "False"
+
+# Load test configuration for Locust
+configurationFiles:
+  - locustfile.py
+
+# Test criteria (auto-stop conditions)
+autoStop:
+  errorRate:
+    percentage: 90
+  responseTimeMs:
+    value: 5000
+
+# Split traffic configuration
+splitTraffic:
+  enabled: false
+
+# Monitoring configuration
+monitoring:
+  resourceIds: []

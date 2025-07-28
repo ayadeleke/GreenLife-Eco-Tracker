@@ -247,7 +247,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
           cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
 
@@ -265,6 +265,35 @@ jobs:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform plan -input=false
+
+      - name: Request Approval for Staging Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚀 **Staging Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for staging environment.\n\n⚠️ This will modify infrastructure resources in the staging environment.'
+              });
+            }
+
+      - name: Wait for Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "Approve Staging Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
 
       - name: Terraform Apply
         working-directory: ./terraform/terraform-staging
@@ -335,7 +364,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
           cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
 
@@ -353,6 +382,35 @@ jobs:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform plan -input=false
+
+      - name: Request Approval for Production Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚨 **PRODUCTION Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for PRODUCTION environment.\n\n⚠️ **CRITICAL**: This will modify infrastructure resources in the PRODUCTION environment.'
+              });
+            }
+
+      - name: Wait for Production Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "🚨 CRITICAL: Approve Production Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for PRODUCTION environment. This requires careful review as it affects production systems."
 
       - name: Terraform Apply
         working-directory: ./terraform/terraform-production

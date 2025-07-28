@@ -69,23 +69,36 @@ jobs:
         fi
 
         echo "Creating load test..."
-        TEST_ID=$(az load test create \
-          --name "ci-load-test-$(date +%Y%m%d-%H%M%S)" \
+        TEST_ID="ci-load-test-$(date +%Y%m%d-%H%M%S)"
+        az load test create \
+          --test-id $TEST_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
+          --display-name "CI Load Test $(date +%Y-%m-%d %H:%M:%S)" \
           --test-plan locustfile.py \
           --env TARGET_URL=$HOST \
           --env USERS=$USERS \
           --env DURATION=$DURATION \
-          --description "Automated load test from GitHub Actions" \
-          --query "testId" -o tsv) || { echo "Failed to create load test"; exit 1; }
+          --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
 
         echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
         echo "Load test started with ID: $TEST_ID"
 
+        echo "Starting test run..."
+        RUN_ID=$(az load test-run create \
+          --test-id $TEST_ID \
+          --resource-group $RESOURCE_GROUP \
+          --load-test-resource $LOAD_TEST_RESOURCE \
+          --display-name "Test Run $(date +%Y-%m-%d %H:%M:%S)" \
+          --description "Automated test run from GitHub Actions" \
+          --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
+
+        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        echo "Test run started with ID: $RUN_ID"
+
         echo "Waiting for test completion..."
-        timeout 600 bash -c "while [[ \$(az load test show \
-          --name $TEST_ID \
+        timeout 600 bash -c "while [[ \$(az load test-run show \
+          --test-run-id $RUN_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
           --query 'status' -o tsv) != 'DONE' ]]; do
@@ -97,7 +110,7 @@ jobs:
       shell: bash
       run: |
         az load test-run download-files \
-          --test-run-id $TEST_ID \
+          --test-run-id $RUN_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
           --path ./test-results

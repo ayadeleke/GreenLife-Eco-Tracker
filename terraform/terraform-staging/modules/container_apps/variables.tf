@@ -137,3 +137,9 @@ variable "registry_password" {
   type        = string
   sensitive   = true
 }
+
+variable "registry_secret_name" {
+  description = "Name for the registry password secret"
+  type        = string
+  default     = "acr-registry-password"
+}

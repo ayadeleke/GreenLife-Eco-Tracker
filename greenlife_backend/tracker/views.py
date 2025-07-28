@@ -237,3 +237,40 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+
+
+# Cache testing endpoint
+from rest_framework.views import APIView
+from django.http import JsonResponse
+import time
+
+class CacheTestView(APIView):
+    """Test endpoint to verify Redis cache functionality"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        test_key = "cache_test_key"
+        timestamp = str(time.time())
+        
+        # Try to get from cache
+        cached_value = cache.get(test_key)
+        
+        if cached_value:
+            return JsonResponse({
+                'status': 'cache_hit',
+                'cached_value': cached_value,
+                'current_time': timestamp,
+                'cache_backend': str(cache.__class__),
+                'redis_url': cache.get('redis_test', 'not_found')
+            })
+        else:
+            # Set a value in cache
+            cache.set(test_key, timestamp, 300)  # 5 minutes
+            cache.set('redis_test', 'Redis is working!', 300)
+            
+            return JsonResponse({
+                'status': 'cache_miss_set',
+                'set_value': timestamp,
+                'current_time': timestamp,
+                'cache_backend': str(cache.__class__)
+            })

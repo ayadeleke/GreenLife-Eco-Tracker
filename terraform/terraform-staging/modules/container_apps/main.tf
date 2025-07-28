@@ -38,6 +38,13 @@ resource "azurerm_container_app" "backend" {
     value = var.registry_password
   }
 
+  # Lifecycle rule to prevent secret removal issues
+  lifecycle {
+    ignore_changes = [
+      secret
+    ]
+  }
+
   template {
     container {
       name   = "backend"
@@ -83,6 +90,13 @@ resource "azurerm_container_app" "frontend" {
   secret {
     name  = "registry-password"
     value = var.registry_password
+  }
+
+  # Lifecycle rule to prevent secret removal issues
+  lifecycle {
+    ignore_changes = [
+      secret
+    ]
   }
 
   template {

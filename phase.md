@@ -9,10 +9,11 @@ This document details the progress in the development of the **GreenLife Eco Tra
 After a successful deployment of the project on azure web service, the frontend and backend of the project were deployed independently for easier management and troubleshooting
 
 ### **Live Application URLs**
-- **Backend API**: [https://greenlifebackendapi.azurewebsites.net](https://greenlifebackendapi.azurewebsites.net)
-- **Frontend Application**: [https://greengoal.azurewebsites.net](https://greengoal.azurewebsites.net)
+- **Production Frontend**: [https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Staging Frontend**: [https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Monitoring Dashboard**: [UptimeRobot Status Page](https://stats.uptimerobot.com/qXpOxvk5CE)
 
-### **Azure App Services Deployment**
+### **Azure Container Apps Deployment**
 
 ### **Container Registry Architecture**
 - **Registry**: Azure Container Registry (ACR)
@@ -24,23 +25,26 @@ After a successful deployment of the project on azure web service, the frontend 
   - Automatic image updates on new deployments
 
 #### **Backend Deployment**
-- **Service Name**: `Greenlifebackend`
-- **Deployment Method**: Azure Container Registry + Azure App Service (Container)
+- **Service Name**: `greenlife-backend`
+- **Deployment Method**: Azure Container Registry + Azure Container Apps
 - **Features**:
   -  Docker containerization with multi-stage builds to reduce the size of the image
-  -  Azure Container Registry (ACR) for image storage
-  -  Python 3.11-alpine runtime environment
-  -  Environment variable configuration for the backend on Azure web service
-  -  Container-based deployment with Azure App Service
+  -  Azure Container Registry (ACR) for secure image storage
+  -  Python 3.11-alpine runtime environment with optimized caching
+  -  Environment variable configuration via Container Apps secrets
+  -  Serverless container deployment with automatic scaling
+  -  Health checks and automatic restart capabilities
 
 #### **Frontend Deployment**
-- **Service Name**: `Greenlifefrontend`
-- **Deployment Method**: Azure Container Registry + Azure App Service (Container)
+- **Service Name**: `greenlife-frontend`
+- **Deployment Method**: Azure Container Registry + Azure Container Apps
 - **Features**:
-  -  Docker containerization with Nginx serving
-  -  Azure Container Registry (ACR) for image storage
-  -  Node.js 20.x build environment
+  -  Docker containerization with Nginx serving and compression
+  -  Azure Container Registry (ACR) for secure image storage
+  -  Node.js 20.x build environment with optimized build process
   -  Environment-specific API URL configuration
+  -  Static asset optimization and caching
+  -  SSL termination and custom domain support
 
 #### **Continuous Integration** (`ci.yml`)
 -  Automated linting (flake8 for Python, ESLint for React)
@@ -117,8 +121,9 @@ After a successful deployment of the project on azure web service, the frontend 
 
 ## 🔗 **Resource Links**
 
-- **Live Application**: [https://greengoal.azurewebsites.net](https://greengoal.azurewebsites.net)
-- **API Documentation**: [https://greenlifebackendapi.azurewebsites.net](https://greenlifebackendapi.azurewebsites.net)
+- **Live Production Application**: [https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Live Staging Application**: [https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Monitoring Dashboard**: [https://stats.uptimerobot.com/qXpOxvk5CE](https://stats.uptimerobot.com/qXpOxvk5CE)
 - **GitHub Repository**: [https://github.com/ayadeleke/GreenLife-Eco-Tracker](https://github.com/ayadeleke/GreenLife-Eco-Tracker)
 - **Project Board**: [Azure DevOps Board](https://dev.azure.com/ay-alu/GreenLife%20Eco%20Tracker/_boards/board/t/GreenLife%20Eco%20Tracker%20Team/Epics)
 
@@ -126,4 +131,4 @@ After a successful deployment of the project on azure web service, the frontend 
 
 **Project Completed By**: Ayotunde Adeleke
 **Date**: July 17, 2025
-**Phase**: Infrastructure & Deployment Phase - 2
+**Phase**: Infrastructure & Deployment Phase - 3

@@ -9,7 +9,7 @@ resource "azurerm_storage_account" "main" {
   account_replication_type = var.replication_type
   
   # Security settings
-  allow_nested_items_to_be_public = false
+  allow_nested_items_to_be_public = true
   shared_access_key_enabled       = true
   
   tags = var.tags

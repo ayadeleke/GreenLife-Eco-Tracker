@@ -1,0 +1,5 @@
+locust>=2.20.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+azure-identity>=1.15.0
+azure-mgmt-loadtesting>=1.0.0

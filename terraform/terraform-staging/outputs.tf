@@ -61,3 +61,19 @@ output "virtual_network_name" {
   description = "Name of the virtual network"
   value       = module.networking.vnet_name
 }
+
+# Load Testing Outputs
+output "load_test_resource_name" {
+  description = "Name of the Azure Load Testing resource"
+  value       = azurerm_load_test.greenlife_load_test_staging.name
+}
+
+output "load_test_resource_id" {
+  description = "Resource ID of the Azure Load Testing resource"
+  value       = azurerm_load_test.greenlife_load_test_staging.id
+}
+
+output "load_test_data_plane_uri" {
+  description = "Data plane URI of the Azure Load Testing resource"
+  value       = azurerm_load_test.greenlife_load_test_staging.data_plane_uri
+}

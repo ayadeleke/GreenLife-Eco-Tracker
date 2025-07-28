@@ -4,6 +4,23 @@
 
 GreenLife Eco Tracker is a full-stack web application for tracking tree planting activities, visualizing environmental impact, and promoting biodiversity. The project features a Django REST API backend and a React/TypeScript frontend, with robust automated testing and CI/CD integration.
 
+## 🌐 Live Applications
+
+- **Production Environment**: [https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Staging Environment**: [https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/](https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io/)
+- **Monitoring Dashboard**: [UptimeRobot Status Page](https://stats.uptimerobot.com/qXpOxvk5CE)
+- **Video Demonstration**: [https://youtube.com/watch?v=your-video-id](https://youtube.com/watch?v=your-video-id)
+
+## 🚀 CI/CD Pipeline
+
+This project implements a complete CI/CD pipeline with:
+- **Automated Testing**: Backend (Django) and Frontend (React) test suites
+- **Security Scanning**: Dependency vulnerability scanning (Safety, pip-audit), static code analysis (Bandit), container image scanning (Trivy)
+- **Infrastructure as Code**: Terraform for Azure resource provisioning
+- **Multi-Environment Deployment**: Automated staging deployment on `develop` branch, production deployment on `main` branch with manual approval
+- **DevSecOps Integration**: Security checks integrated into every deployment
+- **Real-time Monitoring**: UptimeRobot monitoring with instant incident alerts and downtime notifications
+
 ---
 
 ## 🌱 Project Description
@@ -18,7 +35,7 @@ GreenLife Eco Tracker enables users to:
 The project is designed with professional software engineering practices, including:
 - Issue tracking and project planning via GitHub Projects
 - Secure repository setup with branch protection and required reviews
-- Automated CI pipeline for linting and testing
+- Automated CI/CD pipeline with comprehensive testing and security scanning
 - Clean, modular codebase with comprehensive unit tests
 
 ---

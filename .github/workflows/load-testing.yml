@@ -58,65 +58,39 @@ jobs:
     - name: Run Azure Load Test
       run: |
         cd load_tests
-        # Generate unique test ID
-        TEST_ID="ci-load-test-$(date +%Y%m%d-%H%M%S)"
-        echo "Creating load test with ID: $TEST_ID"
-        # Create the load test
-        az load test create \
-          --test-id "$TEST_ID" \
+        # Create or update test configuration and capture test ID
+        echo "Creating load test..."
+        TEST_ID=$(az load test create \
+          --name "ci-load-test-$(date +%Y%m%d-%H%M%S)" \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
-          --display-name "CI Load Test $(date)" \
-          --description "Automated load test from GitHub Actions" \
           --test-plan locustfile.py \
-          --env TARGET_URL="$HOST" USERS="$USERS" DURATION="$DURATION" ENABLE_LOGGING="False"
-
-        if [ $? -ne 0 ]; then
+          --env TARGET_URL=$HOST \
+          --env USERS=$USERS \
+          --env DURATION=$DURATION \
+          --description "Automated load test from GitHub Actions" \
+          --query "testId" -o tsv) || echo "FAILED"
+        
+        if [[ "$TEST_ID" == "FAILED" ]]; then
           echo "Failed to create load test"
           exit 1
         fi
-
+        
         echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
-        echo "Load test created with ID: $TEST_ID"
-
-        # Start the test run
-        echo "Starting load test run..."
-        RUN_ID=$(az load test-run create \
-          --test-id "$TEST_ID" \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --display-name "CI Run $(date)" \
-          --query "testRunId" -o tsv)
-
-        if [ -z "$RUN_ID" ]; then
-          echo "Failed to start test run"
-          exit 1
-        fi
-
-        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-        echo "Test run started with ID: $RUN_ID"
-
+        echo "Load test started with ID: $TEST_ID"
+        
         # Wait for test to complete (with timeout)
         echo "Waiting for test completion..."
-        timeout 900 bash -c 'while [[ $(az load test-run show --test-run-id '$RUN_ID' --resource-group '$RESOURCE_GROUP' --load-test-resource '$LOAD_TEST_RESOURCE' --query "status" -o tsv) != "DONE" ]]; do echo "Test in progress..."; sleep 30; done'
+        timeout 600 bash -c 'while [[ $(az load test show --name '$TEST_ID' --resource-group '$RESOURCE_GROUP' --load-test-resource '$LOAD_TEST_RESOURCE' --query "status" -o tsv) != "DONE" ]]; do echo "Test in progress..."; sleep 30; done'
 
     - name: Download Test Results
       run: |
-        # Download test results
-        echo "Downloading test results for run ID: $RUN_ID"
+        # Wait for test completion and download results
         az load test-run download-files \
-          --test-run-id $RUN_ID \
+          --test-run-id $TEST_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
           --path ./test-results
-
-        # Show test results summary
-        echo "Test results summary:"
-        az load test-run show \
-          --test-run-id $RUN_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --query "{status: status, startDateTime: startDateTime, endDateTime: endDateTime}" -o table
 
     - name: Upload Azure Load Test Results
       uses: actions/upload-artifact@v4

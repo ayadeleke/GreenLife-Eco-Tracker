@@ -1,0 +1,103 @@
+# Auto Load Testing on Push
+
+name: Load Testing
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    env:
+      USERS: 50
+      DURATION: 300
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Azure CLI and dependencies
+      run: |
+        pip install locust requests python-dotenv
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        az extension add --name load
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Determine environment and set variables
+      run: |
+        if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+          echo "ENVIRONMENT=production" >> $GITHUB_ENV
+          echo "LOAD_TEST_RESOURCE=greenlife-load-test-prod-81jg" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=Greenlifebackend_group-prod" >> $GITHUB_ENV
+          echo "HOST=https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
+        elif [[ "${GITHUB_REF##*/}" == "develop" ]]; then
+          echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          echo "LOAD_TEST_RESOURCE=greenlife-load-test-staging-91ha" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=Greenlifebackend_group-a7e3" >> $GITHUB_ENV
+          echo "HOST=https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
+        else
+          echo "ENVIRONMENT=web" >> $GITHUB_ENV
+          echo "LOAD_TEST_RESOURCE=greenlife-load-test-web" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=Greenlifefrontend_group" >> $GITHUB_ENV
+          echo "HOST=https://greengoal.azurewebsites.net" >> $GITHUB_ENV
+        fi
+
+    - name: Run Azure Load Test
+      run: |
+        cd load_tests
+        # Create or update test configuration and capture test ID
+        echo "Creating load test..."
+        TEST_ID=$(az load test create \
+          --name "ci-load-test-$(date +%Y%m%d-%H%M%S)" \
+          --resource-group $RESOURCE_GROUP \
+          --load-test-resource $LOAD_TEST_RESOURCE \
+          --test-plan locustfile.py \
+          --env TARGET_URL=$HOST \
+          --env USERS=$USERS \
+          --env DURATION=$DURATION \
+          --description "Automated load test from GitHub Actions" \
+          --query "testId" -o tsv 2>/dev/null || echo "FAILED")
+        
+        if [[ "$TEST_ID" == "FAILED" ]]; then
+          echo "Failed to create load test"
+          exit 1
+        fi
+        
+        echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
+        echo "Load test started with ID: $TEST_ID"
+        
+        # Wait for test to complete (with timeout)
+        echo "Waiting for test completion..."
+        timeout 600 bash -c 'while [[ $(az load test show --name '$TEST_ID' --resource-group '$RESOURCE_GROUP' --load-test-resource '$LOAD_TEST_RESOURCE' --query "status" -o tsv) != "DONE" ]]; do echo "Test in progress..."; sleep 30; done'
+
+    - name: Download Test Results
+      run: |
+        # Wait for test completion and download results
+        az load test-run download-files \
+          --test-run-id $TEST_ID \
+          --resource-group $RESOURCE_GROUP \
+          --load-test-resource $LOAD_TEST_RESOURCE \
+          --path ./test-results
+
+    - name: Upload Azure Load Test Results
+      uses: actions/upload-artifact@v4
+      env:
+        ENVIRONMENT: ${{ env.ENVIRONMENT }}
+      with:
+        name: azure-load-test-results-${{ env.ENVIRONMENT }}
+        path: |
+          ./test-results/
+          load_tests/locustfile.py

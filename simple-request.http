@@ -1,0 +1,4 @@
+@baseUrl = https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/
+
+GET {{baseUrl}}/
+Content-Type: application/json

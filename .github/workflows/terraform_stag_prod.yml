@@ -261,10 +261,16 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform plan -input=false
 
       - name: Terraform Apply
         working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform apply -auto-approve -input=false
 
       - name: Log in to Azure Container Registry
@@ -343,10 +349,16 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform plan -input=false
 
       - name: Terraform Apply
         working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
         run: terraform apply -auto-approve -input=false
 
       - name: Log in to Azure Container Registry

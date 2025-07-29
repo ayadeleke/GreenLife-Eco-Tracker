@@ -176,4 +176,3 @@ jobs:
       - name: Run frontend tests
         working-directory: ./greenlife-frontend
         run: npm test
-

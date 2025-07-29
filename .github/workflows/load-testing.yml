@@ -8,6 +8,10 @@ on:
       - main
       - develop
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   load-test:
     runs-on: ubuntu-latest
@@ -60,25 +64,36 @@ jobs:
     - name: Run Azure Load Test
       shell: bash
       run: |
+        set -x  # Enable command echo for debug
+
         cd load_tests
 
-        # Verify locustfile exists
         if [[ ! -f locustfile.py ]]; then
           echo "ERROR: locustfile.py not found in load_tests/"
           exit 1
         fi
 
+        echo "Environment variables:"
+        echo "RESOURCE_GROUP=$RESOURCE_GROUP"
+        echo "LOAD_TEST_RESOURCE=$LOAD_TEST_RESOURCE"
+        echo "HOST=$HOST"
+        echo "USERS=$USERS"
+        echo "DURATION=$DURATION"
+
         echo "Creating load test..."
-        TEST_ID="ci-load-test-$(date +%Y%m%d-%H%M%S)"
+        TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
+        TEST_ID="ci-load-test-$TIMESTAMP"
+        DISPLAY_NAME="CI Load Test $(date '+%Y-%m-%d %H:%M:%S')"
+
         az load test create \
-          --test-id $TEST_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --display-name "CI Load Test $(date +%Y-%m-%d %H:%M:%S)" \
+          --test-id "$TEST_ID" \
+          --resource-group "$RESOURCE_GROUP" \
+          --load-test-resource "$LOAD_TEST_RESOURCE" \
+          --display-name "$DISPLAY_NAME" \
           --test-plan locustfile.py \
-          --env TARGET_URL=$HOST \
-          --env USERS=$USERS \
-          --env DURATION=$DURATION \
+          --env TARGET_URL="$HOST" \
+          --env USERS="$USERS" \
+          --env DURATION="$DURATION" \
           --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
 
         echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
@@ -86,33 +101,56 @@ jobs:
 
         echo "Starting test run..."
         RUN_ID=$(az load test-run create \
-          --test-id $TEST_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --display-name "Test Run $(date +%Y-%m-%d %H:%M:%S)" \
+          --test-id "$TEST_ID" \
+          --resource-group "$RESOURCE_GROUP" \
+          --load-test-resource "$LOAD_TEST_RESOURCE" \
+          --test-run-id "run-$TIMESTAMP" \
+          --display-name "Test Run $(date '+%Y-%m-%d %H:%M:%S')" \
           --description "Automated test run from GitHub Actions" \
           --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
 
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "Test run started with ID: $RUN_ID"
 
-        echo "Waiting for test completion..."
-        timeout 600 bash -c "while [[ \$(az load test-run show \
-          --test-run-id $RUN_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --query 'status' -o tsv) != 'DONE' ]]; do
-            echo 'Test in progress...';
-            sleep 30;
-          done"
+        echo "Waiting for test completion (up to 10 minutes)..."
+
+        set +e  # Allow loop to handle timeout itself
+
+        timeout 600 bash -c "
+          while [[ \$(az load test-run show \
+            --test-run-id $RUN_ID \
+            --resource-group $RESOURCE_GROUP \
+            --load-test-resource $LOAD_TEST_RESOURCE \
+            --query 'status' -o tsv) != 'DONE' ]]; do
+              STATUS=\$(az load test-run show \
+                --test-run-id $RUN_ID \
+                --resource-group $RESOURCE_GROUP \
+                --load-test-resource $LOAD_TEST_RESOURCE \
+                --query 'status' -o tsv)
+              echo \"Test status: \$STATUS. Waiting 30s...\"
+              sleep 30
+          done
+        "
+
+        EXIT_CODE=$?
+        set -e
+
+        if [[ $EXIT_CODE -eq 124 ]]; then
+          echo "ERROR: Test timed out waiting for completion after 10 minutes."
+          # Optional: get test run final status and logs here
+          az load test-run show --test-run-id $RUN_ID --resource-group $RESOURCE_GROUP --load-test-resource $LOAD_TEST_RESOURCE
+          exit 1
+        else
+          echo "Test completed successfully."
+        fi
 
     - name: Download Test Results
       shell: bash
       run: |
         az load test-run download-files \
-          --test-run-id $RUN_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
+          --test-run-id "$RUN_ID" \
+          --resource-group "$RESOURCE_GROUP" \
+          --load-test-resource "$LOAD_TEST_RESOURCE" \
           --path ./test-results
 
     - name: Upload Azure Load Test Results

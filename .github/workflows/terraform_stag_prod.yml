@@ -342,6 +342,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Update Container App Images (Staging)
         run: |
           # Update backend container app with new image
@@ -460,6 +467,7 @@ jobs:
       - name: Push Backend Image
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+
       - name: Build Frontend Image
         run: |
           docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest ./greenlife-frontend
@@ -471,6 +479,7 @@ jobs:
       - name: Push Frontend Image
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+
       - name: Azure Login (OIDC)
         uses: azure/login@v1
         with:

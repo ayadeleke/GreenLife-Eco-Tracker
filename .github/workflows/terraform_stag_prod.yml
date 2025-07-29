@@ -344,17 +344,21 @@ jobs:
 
       - name: Update Container App Images (Staging)
         run: |
-          # Update backend container app with new image
+          # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
             --name greenlife-api \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+            --resource-group Greenlifebackend_group-a7e3 \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
+            DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
+            DEBUG="False"
           
-          # Update frontend container app with new image  
+          # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
             --name greenlife-tracker \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
+            --resource-group Greenlifefrontend_group \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest \
+            --set-env-vars VITE_API_URL="https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
 
   production:
     name: 'Production Deploy'
@@ -480,14 +484,18 @@ jobs:
 
       - name: Update Container App Images (Production)
         run: |
-          # Update backend container app with new image
+          # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
             --name greenlife-api \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
-          
-          # Update frontend container app with new image 
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
+            DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
+            DEBUG="False"
+
+          # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
             --name greenlife-tracker \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest \
+            --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"

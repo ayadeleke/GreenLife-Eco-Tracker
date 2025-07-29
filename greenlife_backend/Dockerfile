@@ -1,5 +1,5 @@
 # Multi-stage build for smaller image
-FROM python:3.11-alpine AS builder
+FROM python:3.11-alpine3.22 AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -9,6 +9,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Install build dependencies
+RUN apk update
 RUN apk add --no-cache \
     gcc \
     musl-dev \
@@ -24,7 +25,7 @@ RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Production stage
-FROM python:3.11-alpine
+FROM python:3.11-alpine3.22
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -34,6 +35,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Install only runtime dependencies
+RUN apk update
 RUN apk add --no-cache \
     mysql-client \
     mariadb-connector-c \

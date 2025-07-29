@@ -21,13 +21,13 @@ variable "frontend_resource_group_name" {
 variable "backend_location" {
   description = "Azure region for backend resources"
   type        = string
-  default     = "Germany West Central"
+  default     = "South Central US"
 }
 
 variable "frontend_location" {
   description = "Azure region for frontend resources"
   type        = string
-  default     = "Germany West Central"
+  default     = "South Central US"
 }
 
 # Storage Variables

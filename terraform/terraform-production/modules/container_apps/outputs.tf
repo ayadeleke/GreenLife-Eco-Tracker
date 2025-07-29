@@ -1,11 +1,11 @@
 output "environment_name" {
   description = "Name of the Container Apps environment"
-  value       = data.azurerm_container_app_environment.staging.name
+  value       = data.azurerm_container_app_environment.shared.name
 }
 
 output "environment_id" {
   description = "ID of the Container Apps environment"
-  value       = data.azurerm_container_app_environment.staging.id
+  value       = data.azurerm_container_app_environment.shared.id
 }
 
 output "backend_app_fqdn" {
@@ -20,5 +20,5 @@ output "frontend_app_fqdn" {
 
 output "log_analytics_workspace_id" {
   description = "ID of the Log Analytics workspace"
-  value       = azurerm_log_analytics_workspace.main.id
+  value       = data.azurerm_log_analytics_workspace.shared.id
 }

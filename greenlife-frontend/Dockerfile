@@ -1,5 +1,5 @@
 # Stage 1: Build the frontend
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.22 AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Serve with NGINX
-FROM nginx:1.25-alpine
+FROM nginx:1.25-alpine3.22
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf

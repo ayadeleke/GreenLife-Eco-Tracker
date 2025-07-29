@@ -84,5 +84,5 @@ variable "debug" {
 variable "allowed_hosts" {
   description = "Django allowed hosts"
   type        = string
-  default     = "localhost,127.0.0.1"
+  default     = "localhost,127.0.0.1,,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io"
 }

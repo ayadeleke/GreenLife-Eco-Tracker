@@ -2,7 +2,7 @@
 # Copy this file to terraform.tfvars and update the values
 
 # Environment Configuration
-environment = "dev"
+environment = "staging"
 
 # Resource Group Configuration
 backend_resource_group_name  = "your-backend-resource-group"

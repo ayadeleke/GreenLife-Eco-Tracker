@@ -37,13 +37,15 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - name: Determine environment and set variables
+      shell: bash
       run: |
-        if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+        BRANCH="${GITHUB_REF##*/}"
+        if [[ "$BRANCH" == "main" ]]; then
           echo "ENVIRONMENT=production" >> $GITHUB_ENV
           echo "LOAD_TEST_RESOURCE=greenlife-load-test-prod-81jg" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=Greenlifebackend_group-prod" >> $GITHUB_ENV
           echo "HOST=https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
-        elif [[ "${GITHUB_REF##*/}" == "develop" ]]; then
+        elif [[ "$BRANCH" == "develop" ]]; then
           echo "ENVIRONMENT=staging" >> $GITHUB_ENV
           echo "LOAD_TEST_RESOURCE=greenlife-load-test-staging-91ha" >> $GITHUB_ENV
           echo "RESOURCE_GROUP=Greenlifebackend_group-a7e3" >> $GITHUB_ENV
@@ -56,46 +58,65 @@ jobs:
         fi
 
     - name: Run Azure Load Test
+      shell: bash
       run: |
         cd load_tests
-        # Create or update test configuration and capture test ID
+
+        # Verify locustfile exists
+        if [[ ! -f locustfile.py ]]; then
+          echo "ERROR: locustfile.py not found in load_tests/"
+          exit 1
+        fi
+
         echo "Creating load test..."
-        TEST_ID=$(az load test create \
-          --name "ci-load-test-$(date +%Y%m%d-%H%M%S)" \
+        TEST_ID="ci-load-test-$(date +%Y%m%d-%H%M%S)"
+        az load test create \
+          --test-id $TEST_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
+          --display-name "CI Load Test $(date +%Y-%m-%d %H:%M:%S)" \
           --test-plan locustfile.py \
           --env TARGET_URL=$HOST \
           --env USERS=$USERS \
           --env DURATION=$DURATION \
-          --description "Automated load test from GitHub Actions" \
-          --query "testId" -o tsv) || echo "FAILED"
-        
-        if [[ "$TEST_ID" == "FAILED" ]]; then
-          echo "Failed to create load test"
-          exit 1
-        fi
-        
+          --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
+
         echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
         echo "Load test started with ID: $TEST_ID"
-        
-        # Wait for test to complete (with timeout)
+
+        echo "Starting test run..."
+        RUN_ID=$(az load test-run create \
+          --test-id $TEST_ID \
+          --resource-group $RESOURCE_GROUP \
+          --load-test-resource $LOAD_TEST_RESOURCE \
+          --display-name "Test Run $(date +%Y-%m-%d %H:%M:%S)" \
+          --description "Automated test run from GitHub Actions" \
+          --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
+
+        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        echo "Test run started with ID: $RUN_ID"
+
         echo "Waiting for test completion..."
-        timeout 600 bash -c 'while [[ $(az load test show --name '$TEST_ID' --resource-group '$RESOURCE_GROUP' --load-test-resource '$LOAD_TEST_RESOURCE' --query "status" -o tsv) != "DONE" ]]; do echo "Test in progress..."; sleep 30; done'
+        timeout 600 bash -c "while [[ \$(az load test-run show \
+          --test-run-id $RUN_ID \
+          --resource-group $RESOURCE_GROUP \
+          --load-test-resource $LOAD_TEST_RESOURCE \
+          --query 'status' -o tsv) != 'DONE' ]]; do
+            echo 'Test in progress...';
+            sleep 30;
+          done"
 
     - name: Download Test Results
+      shell: bash
       run: |
-        # Wait for test completion and download results
         az load test-run download-files \
-          --test-run-id $TEST_ID \
+          --test-run-id $RUN_ID \
           --resource-group $RESOURCE_GROUP \
           --load-test-resource $LOAD_TEST_RESOURCE \
           --path ./test-results
 
     - name: Upload Azure Load Test Results
       uses: actions/upload-artifact@v4
-      env:
-        ENVIRONMENT: ${{ env.ENVIRONMENT }}
       with:
         name: azure-load-test-results-${{ env.ENVIRONMENT }}
         path: |

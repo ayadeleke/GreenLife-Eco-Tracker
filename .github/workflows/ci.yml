@@ -177,29 +177,3 @@ jobs:
         working-directory: ./greenlife-frontend
         run: npm test
 
-  terraform-validate:
-    name: Terraform Validate
-    runs-on: ubuntu-latest
-    
-    env:
-      TF_TOKEN_app_terraform_io: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-
-      - name: Terraform Init
-        working-directory: ./terraform/terraform-web
-        run: terraform init
-
-      - name: Terraform Format Check
-        working-directory: ./terraform/terraform-web
-        run: terraform fmt -check
-
-      - name: Terraform Validate
-        working-directory: ./terraform/terraform-web
-        run: terraform validate

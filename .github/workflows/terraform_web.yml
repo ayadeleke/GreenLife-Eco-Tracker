@@ -47,7 +47,7 @@ name: 'Terraform'
 on:
   push:
     branches:
-      - develop
+      - web-deploy
 
 permissions:
   contents: read

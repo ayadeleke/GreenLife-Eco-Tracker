@@ -1,25 +1,22 @@
 # Container Apps Module
-# This module creates Container Apps using existing Container App Environment
+# This module manages the shared Container App Environment and Production Apps
+# Note: Environment is shared between staging and production due to subscription limits
 
-# Use existing Container App Environment from staging
-data "azurerm_container_app_environment" "staging" {
+# Use existing shared Container App Environment
+data "azurerm_container_app_environment" "shared" {
   name                = "greenlife-container-env-91ha"
   resource_group_name = "Greenlifebackend_group-a7e3"
 }
 
-resource "azurerm_log_analytics_workspace" "main" {
-  name                = var.log_analytics_name
-  resource_group_name = var.resource_group_name
-  location           = var.location
-  sku                = var.log_analytics_sku
-  retention_in_days   = var.retention_in_days
-  
-  tags = var.tags
+# Use existing shared Log Analytics workspace
+data "azurerm_log_analytics_workspace" "shared" {
+  name                = "greenlife-logs-91ha"
+  resource_group_name = "Greenlifebackend_group-a7e3"
 }
 
 resource "azurerm_container_app" "backend" {
   name                         = var.backend_app_name
-  container_app_environment_id = data.azurerm_container_app_environment.staging.id
+  container_app_environment_id = data.azurerm_container_app_environment.shared.id
   resource_group_name          = var.resource_group_name
   revision_mode               = "Single"
 
@@ -32,6 +29,13 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "registry-password"
     value = var.registry_password
+  }
+
+  # Lifecycle rule to prevent secret removal issues
+  lifecycle {
+    ignore_changes = [
+      secret
+    ]
   }
 
   template {
@@ -66,7 +70,7 @@ resource "azurerm_container_app" "backend" {
 
 resource "azurerm_container_app" "frontend" {
   name                         = var.frontend_app_name
-  container_app_environment_id = data.azurerm_container_app_environment.staging.id
+  container_app_environment_id = data.azurerm_container_app_environment.shared.id
   resource_group_name          = var.frontend_resource_group_name
   revision_mode               = "Single"
 
@@ -79,6 +83,13 @@ resource "azurerm_container_app" "frontend" {
   secret {
     name  = "registry-password"
     value = var.registry_password
+  }
+
+  # Lifecycle rule to prevent secret removal issues
+  lifecycle {
+    ignore_changes = [
+      secret
+    ]
   }
 
   template {

@@ -1,0 +1,48 @@
+# Terraform Variables File - Example
+# Copy this file to terraform.tfvars and update with your actual values
+# DO NOT commit terraform.tfvars to version control
+
+# Environment Configuration
+environment = "staging"
+
+# Resource Group Configuration
+backend_resource_group_name  = "Greenlifebackend_group-a7e3"
+frontend_resource_group_name = "Greenlifefrontend_group"
+backend_location            = "South Central US"
+frontend_location           = "Germany West Central"
+
+# Storage Configuration
+storage_account_name = "greenlifestorage450"
+
+# Container Registry Configuration
+container_registry_name     = "GreenlifebackendRegistry"
+container_registry_location = "Germany West Central"
+
+# App Service Configuration
+service_plan_name    = "ASP-Greenlifebackendgroupa7e3-af92"
+backend_app_name     = "greenlifebackendapi"
+frontend_app_name    = "greengoal"
+
+# External Database Configuration (Aiven Cloud)
+# IMPORTANT: Replace these with your actual values
+db_host     = "your-database-host.com"
+db_port     = "your-port"
+db_name     = "your-database-name"
+db_user     = "your-username"
+db_password = "your-password"  # Update with your actual password
+
+# Django Application Configuration
+django_secret_key = "your-secret-key"  # Change this!
+debug            = "False"  # Set to False for production
+allowed_hosts    = "localhost,127.0.0.1,0.0.0.0,greenlifebackendapi.azurewebsites.net,greengoal.azurewebsites.net"
+
+# Container Registry Credentials
+registry_server_url = "https://greenlifebackendregistry.azurecr.io"
+registry_username   = "your-registry-username"
+registry_password   = "your-registry-password"
+
+# Redis Configuration
+redis_url = "redis://127.0.0.1:6379/1"
+
+# API URL for frontend
+api_url = "https://greenlifebackendapi.azurewebsites.net/api"

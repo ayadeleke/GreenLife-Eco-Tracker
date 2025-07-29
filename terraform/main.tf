@@ -8,8 +8,8 @@ terraform {
   }
   cloud {
     organization = "DevOps_GreenLife"
-    workspaces {
-      name = "remote_state"
+        workspaces {
+      name = "web_remote"
     }
   }
 }

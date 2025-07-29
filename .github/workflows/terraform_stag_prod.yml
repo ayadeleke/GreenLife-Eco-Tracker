@@ -1,0 +1,501 @@
+# This workflow installs the latest version of Terraform CLI and configures the Terraform CLI configuration file
+# with an API token for Terraform Cloud (app.terraform.io). On pull request events, this workflow will run
+# `terraform init`, `terraform fmt`, and `terraform plan` (speculative plan via Terraform Cloud). On push events
+# to the "main" branch, `terraform apply` will be executed.
+#
+# Documentation for `hashicorp/setup-terraform` is located here: https://github.com/hashicorp/setup-terraform
+#
+# To use this workflow, you will need to complete the following setup steps.
+#
+# 1. Create a `main.tf` file in the root of this repository with the `remote` backend and one or more resources defined.
+#   Example `main.tf`:
+#     # The configuration for the `remote` backend.
+#     terraform {
+#       backend "remote" {
+#         # The name of your Terraform Cloud organization.
+#         organization = "example-organization"
+#
+#         # The name of the Terraform Cloud workspace to store Terraform state files in.
+#         workspaces {
+#           name = "example-workspace"
+#         }
+#       }
+#     }
+#
+#     # An example resource that does nothing.
+#     resource "null_resource" "example" {
+#       triggers = {
+#         value = "A example resource that does nothing!"
+#       }
+#     }
+#
+#
+# 2. Generate a Terraform Cloud user API token and store it as a GitHub secret (e.g. TF_API_TOKEN) on this repository.
+#   Documentation:
+#     - https://www.terraform.io/docs/cloud/users-teams-organizations/api-tokens.html
+#     - https://help.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets
+#
+# 3. Reference the GitHub secret in step using the `hashicorp/setup-terraform` GitHub Action.
+#   Example:
+#     - name: Setup Terraform
+#       uses: hashicorp/setup-terraform@v1
+#       with:
+#         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+name: 'Terraform'
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8
+      - name: Run flake8
+        working-directory: ./greenlife_backend
+        run: flake8 tracker config
+
+  backend-format:
+    name: Backend Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black
+      - name: Run black
+        working-directory: ./greenlife_backend
+        run: black tracker config
+
+  backend-security:
+    name: Backend Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install security tools
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit safety pip-audit
+      - name: Bandit security scan
+        working-directory: ./greenlife_backend
+        run: bandit -r tracker config
+      - name: Safety vulnerability check
+        working-directory: ./greenlife_backend
+        run: safety scan --full-report
+        continue-on-error: true
+      - name: Pip-audit vulnerability check
+        working-directory: ./greenlife_backend
+        run: pip-audit
+        continue-on-error: true
+
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: greenlife_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
+    env:
+      DB_NAME: greenlife_db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Wait for MySQL
+        run: |
+          sudo apt-get install -y mysql-client
+          until mysqladmin ping -h"127.0.0.1" --silent; do
+            sleep 1
+          done
+          sleep 5
+      - name: Create staticfiles directory
+        run: mkdir -p ./greenlife_backend/staticfiles
+      - name: Migrate test database
+        working-directory: ./greenlife_backend
+        run: python manage.py migrate
+      - name: Run Django tests
+        working-directory: ./greenlife_backend
+        run: python manage.py test
+
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend dependencies
+        working-directory: ./greenlife-frontend
+        run: npm ci
+      - name: Run ESLint
+        working-directory: ./greenlife-frontend
+        run: npx eslint src --max-warnings=0
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend dependencies
+        working-directory: ./greenlife-frontend
+        run: npm ci
+      - name: Run frontend tests
+        working-directory: ./greenlife-frontend
+        run: npm test
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-web
+        run: terraform init
+      - name: Terraform Format Check
+        working-directory: ./terraform/terraform-web
+        run: terraform fmt -check
+      - name: Terraform Validate
+        working-directory: ./terraform/terraform-web
+        run: terraform validate
+      - name: Terraform Security Scan (tfsec)
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          tfsec ./terraform/terraform-web --soft-fail
+  staging:
+    name: 'Staging Deploy'
+    runs-on: ubuntu-latest
+    environment: staging
+    if: github.ref == 'refs/heads/develop'
+    needs:
+      - backend-lint
+      - backend-format
+      - backend-security
+      - backend-tests
+      - frontend-lint
+      - frontend-tests
+      - terraform-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-staging
+        run: terraform init
+
+      - name: Terraform Format
+        working-directory: ./terraform/terraform-staging
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform plan -input=false
+
+      - name: Request Approval for Staging Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚀 **Staging Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for staging environment.\n\n⚠️ This will modify infrastructure resources in the staging environment.'
+              });
+            }
+      - name: Wait for Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
+          approvers: ayadeleke
+          minimum-approvals: 1
+          issue-title: "Approve Staging Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform apply -auto-approve -input=false
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER_STAGING }}
+          username: ${{ secrets.ACR_USERNAME_STAGING }}
+          password: ${{ secrets.ACR_PASSWORD_STAGING }}
+
+
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest ./greenlife_backend
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+      - name: Scan Backend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+        continue-on-error: true
+
+      - name: Push Backend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+      - name: Build Frontend Image
+        run: |
+          docker build --build-arg VITE_API_URL=https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api \
+            -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest ./greenlife-frontend
+      - name: Scan Frontend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest
+        continue-on-error: true
+
+      - name: Push Frontend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App Images (Staging)
+        run: |
+          # Update backend container app with new image and ensure all environment variables are set
+          az containerapp update \
+            --name greenlife-api \
+            --resource-group Greenlifebackend_group-a7e3 \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
+            DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
+            DEBUG="False"
+          
+          # Update frontend container app with new image and ensure API URL is set
+          az containerapp update \
+            --name greenlife-tracker \
+            --resource-group Greenlifefrontend_group \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest \
+            --set-env-vars VITE_API_URL="https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
+
+  production:
+    name: 'Production Deploy'
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - backend-lint
+      - backend-format
+      - backend-security
+      - backend-tests
+      - frontend-lint
+      - frontend-tests
+      - terraform-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-production
+        run: terraform init
+
+      - name: Terraform Format
+        working-directory: ./terraform/terraform-production
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform plan -input=false
+
+      - name: Request Approval for Production Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚨 **PRODUCTION Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for PRODUCTION environment.\n\n⚠️ **CRITICAL**: This will modify infrastructure resources in the PRODUCTION environment.'
+              });
+            }
+      - name: Wait for Production Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
+          approvers: ayadeleke
+          minimum-approvals: 1
+          issue-title: "Approve Staging Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform apply -auto-approve -input=false
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}
+          username: ${{ secrets.ACR_USERNAME_PRODUCTION }}
+          password: ${{ secrets.ACR_PASSWORD_PRODUCTION }}
+
+
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest ./greenlife_backend
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+      - name: Scan Backend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+        continue-on-error: true
+
+      - name: Push Backend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+
+      - name: Build Frontend Image
+        run: |
+          docker build --build-arg VITE_API_URL=https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api \
+            -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest ./greenlife-frontend
+      - name: Scan Frontend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+        continue-on-error: true
+
+      - name: Push Frontend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App Images (Production)
+        run: |
+          # Update backend container app with new image and ensure all environment variables are set
+          az containerapp update \
+            --name greenlife-api \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
+            DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
+            DEBUG="False"
+
+          # Update frontend container app with new image and ensure API URL is set
+          az containerapp update \
+            --name greenlife-tracker \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest \
+            --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"

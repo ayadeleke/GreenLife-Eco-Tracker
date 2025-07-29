@@ -1,5 +1,5 @@
 # Stage 1: Build the frontend
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.22 AS builder
 
 WORKDIR /app
 
@@ -13,14 +13,14 @@ RUN npm ci
 COPY . .
 
 # Build argument for API URL
-ARG VITE_API_URL=https://greenlifebackendapi.azurewebsites.net/api
+ARG VITE_API_URL=http://localhost:8000/api
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build the application
 RUN npm run build
 
 # Stage 2: Serve with NGINX
-FROM nginx:1.25-alpine
+FROM nginx:1.27-alpine
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf

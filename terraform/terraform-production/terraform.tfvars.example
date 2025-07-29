@@ -1,0 +1,26 @@
+# Example Terraform Variables File
+# Copy this file to terraform.tfvars and update the values
+
+# Environment Configuration
+environment = "staging"
+
+# Resource Group Configuration
+backend_resource_group_name  = "your-backend-resource-group"
+frontend_resource_group_name = "your-frontend-resource-group"
+backend_location            = "South Central US"
+frontend_location           = "Germany West Central"
+
+# Storage Configuration
+storage_account_name = "yourstorageaccountname"
+
+# External Database Configuration (Aiven Cloud)
+db_host     = "your-database-host.com"
+db_port     = "your-port"
+db_name     = "your-database-name"
+db_user     = "your-username"
+db_password = "your-password"  # Update with your actual password
+
+# Django Application Configuration
+django_secret_key = "your-secret-key"  # Change this!
+debug            = "False"  # Set to False for production
+allowed_hosts    = "localhost,127.0.0.1"  # Add your domain names

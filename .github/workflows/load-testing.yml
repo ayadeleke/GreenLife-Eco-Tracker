@@ -1,5 +1,3 @@
-# Auto Load Testing on Push
-
 name: Load Testing
 
 on:
@@ -21,111 +19,122 @@ jobs:
       DURATION: 300
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install Azure CLI and dependencies
-      run: |
-        pip install locust requests python-dotenv
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        az extension add --name load
+      - name: Install Azure CLI and dependencies
+        run: |
+          pip install locust requests python-dotenv
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          az extension add --name load
+        shell: bash
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Determine environment and set variables
-      shell: bash
-      run: |
-        BRANCH="${GITHUB_REF##*/}"
-        if [[ "$BRANCH" == "main" ]]; then
-          echo "ENVIRONMENT=production" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-prod-81jg" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifebackend_group-prod" >> $GITHUB_ENV
-          echo "HOST=https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
-        elif [[ "$BRANCH" == "develop" ]]; then
-          echo "ENVIRONMENT=staging" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-staging-91ha" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifebackend_group-a7e3" >> $GITHUB_ENV
-          echo "HOST=https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
-        else
-          echo "ENVIRONMENT=web" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-web" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifefrontend_group" >> $GITHUB_ENV
-          echo "HOST=https://greengoal.azurewebsites.net" >> $GITHUB_ENV
-        fi
+      - name: Determine environment and set variables
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          if [[ "$BRANCH" == "main" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+            echo "LOAD_TEST_RESOURCE=greenlife-load-test-prod-81jg" >> $GITHUB_ENV
+            echo "RESOURCE_GROUP=Greenlifebackend_group-prod" >> $GITHUB_ENV
+            echo "HOST=https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
+          elif [[ "$BRANCH" == "develop" ]]; then
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+            echo "LOAD_TEST_RESOURCE=greenlife-load-test-staging-91ha" >> $GITHUB_ENV
+            echo "RESOURCE_GROUP=Greenlifebackend_group-a7e3" >> $GITHUB_ENV
+            echo "HOST=https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=web" >> $GITHUB_ENV
+            echo "LOAD_TEST_RESOURCE=greenlife-load-test-web" >> $GITHUB_ENV
+            echo "RESOURCE_GROUP=Greenlifefrontend_group" >> $GITHUB_ENV
+            echo "HOST=https://greengoal.azurewebsites.net" >> $GITHUB_ENV
+          fi
 
-    - name: Run Azure Load Test
-      shell: bash
-      run: |
-        cd load_tests
+      - name: Run Azure Load Test
+        shell: bash
+        run: |
+          cd load_tests
+          if [[ ! -f locustfile.py ]]; then
+            echo "ERROR: locustfile.py not found in load_tests/"
+            exit 1
+          fi
 
-        if [[ ! -f locustfile.py ]]; then
-          echo "ERROR: locustfile.py not found in load_tests/"
-          exit 1
-        fi
+          TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
+          TEST_ID="ci-load-test-$TIMESTAMP"
+          DISPLAY_NAME="CI Load Test $(date '+%Y-%m-%d %H:%M:%S')"
 
-        echo "Creating load test..."
-        TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
-        TEST_ID="ci-load-test-$TIMESTAMP"
-        DISPLAY_NAME="CI Load Test $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "Creating load test..."
+          az load test create \
+            --test-id "$TEST_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" \
+            --display-name "$DISPLAY_NAME" \
+            --test-plan locustfile.py \
+            --env TARGET_URL="$HOST" \
+            --env USERS="$USERS" \
+            --env DURATION="$DURATION" \
+            --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
+          echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
+          echo "Load test started with ID: $TEST_ID"
 
-        az load test create \
-          --test-id "$TEST_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --display-name "$DISPLAY_NAME" \
-          --test-plan locustfile.py \
-          --env TARGET_URL="$HOST" \
-          --env USERS="$USERS" \
-          --env DURATION="$DURATION" \
-          --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
+          echo "Starting test run..."
+          RUN_ID=$(az load test-run create \
+            --test-id "$TEST_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" \
+            --test-run-id "run-$TIMESTAMP" \
+            --display-name "Test Run $(date '+%Y-%m-%d %H:%M:%S')" \
+            --description "Automated test run from GitHub Actions" \
+            --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Test run started with ID: $RUN_ID"
 
-        echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
-        echo "Load test started with ID: $TEST_ID"
+          echo "Waiting for test completion (timeout in 10 minutes)..."
+          timeout 600 bash -c "
+            while true; do
+              STATUS=\$(az load test-run show \
+                --test-run-id $RUN_ID \
+                --resource-group $RESOURCE_GROUP \
+                --load-test-resource $LOAD_TEST_RESOURCE \
+                --query 'status' -o tsv 2>/dev/null) || break
+              if [[ \"\$STATUS\" == \"DONE\" ]]; then
+                echo 'Test completed.'
+                exit 0
+              fi
+              echo \"Test in progress: \$STATUS...\"
+              sleep 30
+            done
+            echo 'Failed to get test run status or test aborted.'
+            exit 1
+          "
+          if [[ $? -ne 0 ]]; then
+            echo "Test did not complete successfully or timed out."
+            exit 1
+          fi
 
-        echo "Starting test run..."
-        RUN_ID=$(az load test-run create \
-          --test-id "$TEST_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --test-run-id "run-$TIMESTAMP" \
-          --display-name "Test Run $(date '+%Y-%m-%d %H:%M:%S')" \
-          --description "Automated test run from GitHub Actions" \
-          --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
+      - name: Download Test Results
+        shell: bash
+        run: |
+          az load test-run download-files \
+            --test-run-id "$RUN_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" \
+            --path ./test-results
 
-        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-        echo "Test run started with ID: $RUN_ID"
-
-        echo "Waiting for test completion..."
-        timeout 600 bash -c "while [[ \$(az load test-run show \
-          --test-run-id $RUN_ID \
-          --resource-group $RESOURCE_GROUP \
-          --load-test-resource $LOAD_TEST_RESOURCE \
-          --query 'status' -o tsv) != 'DONE' ]]; do
-            echo 'Test in progress...';
-            sleep 30;
-          done"
-
-    - name: Download Test Results
-      shell: bash
-      run: |
-        az load test-run download-files \
-          --test-run-id "$RUN_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --path ./test-results
-
-    - name: Upload Azure Load Test Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: azure-load-test-results-${{ env.ENVIRONMENT }}
-        path: |
-          ./test-results/
-          load_tests/locustfile.py
+      - name: Upload Azure Load Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-load-test-results-${{ env.ENVIRONMENT }}
+          path: |
+            ./test-results/
+            load_tests/locustfile.py

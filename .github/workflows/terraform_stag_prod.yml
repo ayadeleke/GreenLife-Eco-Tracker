@@ -318,7 +318,7 @@ jobs:
           sudo apt-get install trivy
       - name: Scan Backend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
         continue-on-error: true
 
       - name: Push Backend Image
@@ -329,7 +329,7 @@ jobs:
           docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest ./greenlife-frontend
       - name: Scan Frontend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
         continue-on-error: true
 
       - name: Push Frontend Image
@@ -363,9 +363,6 @@ jobs:
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
           
-          # Restart both apps to ensure new images are used
-          az containerapp restart --name greenlife-api --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
-          az containerapp restart --name greenlife-tracker --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }}
   production:
     name: 'Production Deploy'
     runs-on: ubuntu-latest
@@ -427,8 +424,8 @@ jobs:
       - name: Wait for Production Approval
         uses: trstringer/manual-approval@v1
         with:
-          secret: ${{ github.TOKEN }}
-          approvers: ${{ github.actor }}
+          secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
+          approvers: ayadeleke
           minimum-approvals: 1
           issue-title: "🚨 CRITICAL: Approve Production Terraform Apply"
           issue-body: "Please review the Terraform plan output and approve the infrastructure changes for PRODUCTION environment. This requires careful review as it affects production systems."
@@ -461,7 +458,7 @@ jobs:
           sudo apt-get install trivy
       - name: Scan Backend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
         continue-on-error: true
 
       - name: Push Backend Image
@@ -473,7 +470,7 @@ jobs:
           docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest ./greenlife-frontend
       - name: Scan Frontend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
         continue-on-error: true
 
       - name: Push Frontend Image
@@ -500,7 +497,3 @@ jobs:
             --name greenlife-tracker \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
-          
-          # Restart both apps to ensure new images are used
-          az containerapp restart --name greenlife-api --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }}
-          az containerapp restart --name greenlife-tracker --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }}

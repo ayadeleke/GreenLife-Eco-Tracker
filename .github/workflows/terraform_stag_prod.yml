@@ -1,162 +1,512 @@
-# Auto Load Testing on Push
+# This workflow installs the latest version of Terraform CLI and configures the Terraform CLI configuration file
+# with an API token for Terraform Cloud (app.terraform.io). On pull request events, this workflow will run
+# `terraform init`, `terraform fmt`, and `terraform plan` (speculative plan via Terraform Cloud). On push events
+# to the "main" branch, `terraform apply` will be executed.
+#
+# Documentation for `hashicorp/setup-terraform` is located here: https://github.com/hashicorp/setup-terraform
+#
+# To use this workflow, you will need to complete the following setup steps.
+#
+# 1. Create a `main.tf` file in the root of this repository with the `remote` backend and one or more resources defined.
+#   Example `main.tf`:
+#     # The configuration for the `remote` backend.
+#     terraform {
+#       backend "remote" {
+#         # The name of your Terraform Cloud organization.
+#         organization = "example-organization"
+#
+#         # The name of the Terraform Cloud workspace to store Terraform state files in.
+#         workspaces {
+#           name = "example-workspace"
+#         }
+#       }
+#     }
+#
+#     # An example resource that does nothing.
+#     resource "null_resource" "example" {
+#       triggers = {
+#         value = "A example resource that does nothing!"
+#       }
+#     }
+#
+#
+# 2. Generate a Terraform Cloud user API token and store it as a GitHub secret (e.g. TF_API_TOKEN) on this repository.
+#   Documentation:
+#     - https://www.terraform.io/docs/cloud/users-teams-organizations/api-tokens.html
+#     - https://help.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets
+#
+# 3. Reference the GitHub secret in step using the `hashicorp/setup-terraform` GitHub Action.
+#   Example:
+#     - name: Setup Terraform
+#       uses: hashicorp/setup-terraform@v1
+#       with:
+#         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-name: Load Testing
+name: 'Terraform'
 
 on:
   push:
     branches:
-      - main
       - develop
+      - main
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  load-test:
+  backend-lint:
+    name: Backend Lint
     runs-on: ubuntu-latest
-
-    env:
-      USERS: 50
-      DURATION: 300
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8
+      - name: Run flake8
+        working-directory: ./greenlife_backend
+        run: flake8 tracker config
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+  backend-format:
+    name: Backend Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black
+      - name: Run black
+        working-directory: ./greenlife_backend
+        run: black tracker config
 
-    - name: Install Azure CLI and dependencies
-      run: |
-        pip install locust requests python-dotenv
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        az extension add --name load
+  backend-security:
+    name: Backend Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install security tools
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit safety pip-audit
+      - name: Bandit security scan
+        working-directory: ./greenlife_backend
+        run: bandit -r tracker config
+      - name: Safety vulnerability check
+        working-directory: ./greenlife_backend
+        run: safety scan --full-report
+        continue-on-error: true
+      - name: Pip-audit vulnerability check
+        working-directory: ./greenlife_backend
+        run: pip-audit
+        continue-on-error: true
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Determine environment and set variables
-      shell: bash
-      run: |
-        BRANCH="${GITHUB_REF##*/}"
-        if [[ "$BRANCH" == "main" ]]; then
-          echo "ENVIRONMENT=production" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-prod-81jg" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifebackend_group-prod" >> $GITHUB_ENV
-          echo "HOST=https://greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
-        elif [[ "$BRANCH" == "develop" ]]; then
-          echo "ENVIRONMENT=staging" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-staging-91ha" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifebackend_group-a7e3" >> $GITHUB_ENV
-          echo "HOST=https://greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io" >> $GITHUB_ENV
-        else
-          echo "ENVIRONMENT=web" >> $GITHUB_ENV
-          echo "LOAD_TEST_RESOURCE=greenlife-load-test-web" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=Greenlifefrontend_group" >> $GITHUB_ENV
-          echo "HOST=https://greengoal.azurewebsites.net" >> $GITHUB_ENV
-        fi
-
-    - name: Run Azure Load Test
-      shell: bash
-      run: |
-        set -x  # Enable command echo for debug
-
-        cd load_tests
-
-        if [[ ! -f locustfile.py ]]; then
-          echo "ERROR: locustfile.py not found in load_tests/"
-          exit 1
-        fi
-
-        echo "Environment variables:"
-        echo "RESOURCE_GROUP=$RESOURCE_GROUP"
-        echo "LOAD_TEST_RESOURCE=$LOAD_TEST_RESOURCE"
-        echo "HOST=$HOST"
-        echo "USERS=$USERS"
-        echo "DURATION=$DURATION"
-
-        echo "Creating load test..."
-        TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
-        TEST_ID="ci-load-test-$TIMESTAMP"
-        DISPLAY_NAME="CI Load Test $(date '+%Y-%m-%d %H:%M:%S')"
-
-        az load test create \
-          --test-id "$TEST_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --display-name "$DISPLAY_NAME" \
-          --test-plan locustfile.py \
-          --env TARGET_URL="$HOST" \
-          --env USERS="$USERS" \
-          --env DURATION="$DURATION" \
-          --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
-
-        echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
-        echo "Load test started with ID: $TEST_ID"
-
-        echo "Starting test run..."
-        RUN_ID=$(az load test-run create \
-          --test-id "$TEST_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --test-run-id "run-$TIMESTAMP" \
-          --display-name "Test Run $(date '+%Y-%m-%d %H:%M:%S')" \
-          --description "Automated test run from GitHub Actions" \
-          --query "testRunId" -o tsv) || { echo "Failed to start test run"; exit 1; }
-
-        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-        echo "Test run started with ID: $RUN_ID"
-
-        echo "Waiting for test completion (up to 10 minutes)..."
-
-        set +e  # Allow loop to handle timeout itself
-
-        timeout 600 bash -c "
-          while [[ \$(az load test-run show \
-            --test-run-id $RUN_ID \
-            --resource-group $RESOURCE_GROUP \
-            --load-test-resource $LOAD_TEST_RESOURCE \
-            --query 'status' -o tsv) != 'DONE' ]]; do
-              STATUS=\$(az load test-run show \
-                --test-run-id $RUN_ID \
-                --resource-group $RESOURCE_GROUP \
-                --load-test-resource $LOAD_TEST_RESOURCE \
-                --query 'status' -o tsv)
-              echo \"Test status: \$STATUS. Waiting 30s...\"
-              sleep 30
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: greenlife_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
+    env:
+      DB_NAME: greenlife_db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install backend dependencies
+        working-directory: ./greenlife_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Wait for MySQL
+        run: |
+          sudo apt-get install -y mysql-client
+          until mysqladmin ping -h"127.0.0.1" --silent; do
+            sleep 1
           done
-        "
+          sleep 5
+      - name: Create staticfiles directory
+        run: mkdir -p ./greenlife_backend/staticfiles
+      - name: Migrate test database
+        working-directory: ./greenlife_backend
+        run: python manage.py migrate
+      - name: Run Django tests
+        working-directory: ./greenlife_backend
+        run: python manage.py test
 
-        EXIT_CODE=$?
-        set -e
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend dependencies
+        working-directory: ./greenlife-frontend
+        run: npm ci
+      - name: Run ESLint
+        working-directory: ./greenlife-frontend
+        run: npx eslint src --max-warnings=0
 
-        if [[ $EXIT_CODE -eq 124 ]]; then
-          echo "ERROR: Test timed out waiting for completion after 10 minutes."
-          # Optional: get test run final status and logs here
-          az load test-run show --test-run-id $RUN_ID --resource-group $RESOURCE_GROUP --load-test-resource $LOAD_TEST_RESOURCE
-          exit 1
-        else
-          echo "Test completed successfully."
-        fi
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend dependencies
+        working-directory: ./greenlife-frontend
+        run: npm ci
+      - name: Run frontend tests
+        working-directory: ./greenlife-frontend
+        run: npm test
 
-    - name: Download Test Results
-      shell: bash
-      run: |
-        az load test-run download-files \
-          --test-run-id "$RUN_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --path ./test-results
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-web
+        run: terraform init
+      - name: Terraform Format Check
+        working-directory: ./terraform/terraform-web
+        run: terraform fmt -check
+      - name: Terraform Validate
+        working-directory: ./terraform/terraform-web
+        run: terraform validate
+      - name: Terraform Security Scan (tfsec)
+        run: |
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          tfsec ./terraform/terraform-web --soft-fail
 
-    - name: Upload Azure Load Test Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: azure-load-test-results-${{ env.ENVIRONMENT }}
-        path: |
-          ./test-results/
-          load_tests/locustfile.py
+  staging:
+    name: 'Staging Deploy'
+    runs-on: ubuntu-latest
+    environment: staging
+    if: github.ref == 'refs/heads/develop'
+    needs:
+      - backend-lint
+      - backend-format
+      - backend-security
+      - backend-tests
+      - frontend-lint
+      - frontend-tests
+      - terraform-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-staging
+        run: terraform init
+
+      - name: Terraform Format
+        working-directory: ./terraform/terraform-staging
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform plan -input=false
+
+      - name: Request Approval for Staging Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚀 **Staging Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for staging environment.\n\n⚠️ This will modify infrastructure resources in the staging environment.'
+              });
+            }
+
+      - name: Wait for Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "Approve Staging Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform apply -auto-approve -input=false
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER_STAGING }}
+          username: ${{ secrets.ACR_USERNAME_STAGING }}
+          password: ${{ secrets.ACR_PASSWORD_STAGING }}
+
+
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest ./greenlife_backend
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+
+      - name: Scan Backend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+        continue-on-error: true
+
+      - name: Push Backend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest ./greenlife-frontend
+
+      - name: Scan Frontend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
+        continue-on-error: true
+
+      - name: Push Frontend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App Images (Staging)
+        run: |
+          # Update backend container app with new image
+          az containerapp update \
+            --name greenlife-api \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
+          
+          # Update frontend container app with new image  
+          az containerapp update \
+            --name greenlife-tracker \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
+          
+          # Restart both apps to ensure new images are used
+          az containerapp restart --name greenlife-api --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
+          az containerapp restart --name greenlife-tracker --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }}
+
+  production:
+    name: 'Production Deploy'
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - backend-lint
+      - backend-format
+      - backend-security
+      - backend-tests
+      - frontend-lint
+      - frontend-tests
+      - terraform-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-production
+        run: terraform init
+
+      - name: Terraform Format
+        working-directory: ./terraform/terraform-production
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform plan -input=false
+
+      - name: Request Approval for Production Deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚨 **PRODUCTION Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for PRODUCTION environment.\n\n⚠️ **CRITICAL**: This will modify infrastructure resources in the PRODUCTION environment.'
+              });
+            }
+
+      - name: Wait for Production Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "🚨 CRITICAL: Approve Production Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for PRODUCTION environment. This requires careful review as it affects production systems."
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        run: terraform apply -auto-approve -input=false
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}
+          username: ${{ secrets.ACR_USERNAME_PRODUCTION }}
+          password: ${{ secrets.ACR_PASSWORD_PRODUCTION }}
+
+
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:prod ./greenlife_backend
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+
+      - name: Scan Backend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+        continue-on-error: true
+
+      - name: Push Backend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:prod ./greenlife-frontend
+
+      - name: Scan Frontend Docker Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+        continue-on-error: true
+
+      - name: Push Frontend Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App Images (Production)
+        run: |
+          # Update backend container app with new image
+          az containerapp update \
+            --name greenlife-api \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:prod
+          
+          # Update frontend container app with new image  
+          az containerapp update \
+            --name greenlife-tracker \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:prod
+          
+          # Restart both apps to ensure new images are used
+          az containerapp restart --name greenlife-api --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }}
+          az containerapp restart --name greenlife-tracker --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }}

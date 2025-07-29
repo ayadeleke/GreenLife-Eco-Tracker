@@ -51,6 +51,7 @@ on:
       - main
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
@@ -341,10 +342,15 @@ jobs:
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:latest
 
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Update Container App Images (Staging)
         run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          
           # Update backend container app with new image
           az containerapp update \
             --name greenlife-api \
@@ -460,12 +466,12 @@ jobs:
 
       - name: Scan Backend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:prod
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
         continue-on-error: true
 
       - name: Push Backend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:prod
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
 
       - name: Build Frontend Image
         run: |
@@ -473,17 +479,22 @@ jobs:
 
       - name: Scan Frontend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:prod
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
         continue-on-error: true
 
       - name: Push Frontend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:prod
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Update Container App Images (Production)
         run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          
           # Update backend container app with new image
           az containerapp update \
             --name greenlife-api \

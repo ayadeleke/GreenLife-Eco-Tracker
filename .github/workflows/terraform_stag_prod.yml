@@ -229,16 +229,24 @@ jobs:
           TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform plan -input=false
 
-      - name: Request Approval
+      - name: Request Approval for Staging Deployment
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
+            const { data: pullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: '🚀 **Staging Deployment Approval Required**\n\nReview the Terraform plan and approve the deployment.'
-            })
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚀 **Staging Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for staging environment.\n\n⚠️ This will modify infrastructure resources in the staging environment.'
+              });
+            }
 
       - name: Wait for Approval
         uses: trstringer/manual-approval@v1
@@ -489,16 +497,24 @@ jobs:
           TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform plan -input=false
 
-      - name: Request Approval
+      - name: Request Approval for Production Deployment
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
+            const { data: pullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: '🚨 **PRODUCTION Deployment Approval Required**\n\nReview the Terraform plan and approve the deployment.'
-            })
+              state: 'open',
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+            if (pullRequests.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequests[0].number,
+                body: '🚨 **PRODUCTION Deployment Approval Required**\n\nTerraform plan has completed successfully. Review the plan output above and approve this deployment to proceed with `terraform apply` for PRODUCTION environment.\n\n⚠️ **CRITICAL**: This will modify infrastructure resources in the PRODUCTION environment.'
+              });
+            }
 
       - name: Wait for Approval
         uses: trstringer/manual-approval@v1

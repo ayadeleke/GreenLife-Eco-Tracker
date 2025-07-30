@@ -29,5 +29,5 @@ jobs:
       - name: Run semantic-release
         working-directory: ./greenlife-frontend
         env:
-          GITHUB_TOKEN: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: npx semantic-release

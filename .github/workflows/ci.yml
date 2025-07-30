@@ -71,15 +71,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install bandit safety
+          pip install bandit
 
       - name: Bandit security scan
         working-directory: ./greenlife_backend
         run: bandit -r tracker config
 
       - name: Safety vulnerability check
-        working-directory: ./greenlife_backend
-        run: safety scan --full-report
+        uses: pyupio/safety-action@v1
+        with:
+          api-key: ${{ secrets.SAFETY_API_KEY }}
         continue-on-error: true
 
   backend-tests:

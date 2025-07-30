@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.0...v1.1.1) (2025-07-30)
+
+
+### Bug Fixes
+
+* **security:** Used the right version of python, alpine and Node ([497a839](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/497a839e5fb0a481dd3ada4f7320f31ad29c2979))
+
 # [1.1.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.0.0...v1.1.0) (2025-07-30)
 
 

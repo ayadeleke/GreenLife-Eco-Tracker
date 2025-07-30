@@ -98,4 +98,5 @@ variable "frontend_image_tag" {
   description = "Frontend container image tag"
   type        = string
   default     = "latest"
+}
 

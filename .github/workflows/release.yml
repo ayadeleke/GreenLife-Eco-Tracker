@@ -1,5 +1,5 @@
 # .github/workflows/release.yml
-name: Releases
+name: Releases for production
 
 on:
   push:

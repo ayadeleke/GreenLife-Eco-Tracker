@@ -1,3 +1,22 @@
+# [2.0.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.2.0...v2.0.0) (2025-07-30)
+
+
+### Bug Fixes
+
+* ensure Docker images are built before Terraform apply ([e2aa7c7](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/e2aa7c77a29f2cf274cc34281edd3653ed0dc4df))
+
+
+### BREAKING CHANGES
+
+* Fix critical deployment order issue where Terraform was trying to deploy container apps with non-existent Docker images
+
+- Split Terraform jobs into plan and apply phases for both staging and production
+- Move Terraform Apply to run AFTER Docker images are built and pushed to ACR
+- Establish correct dependency chain: Plan → Build → Scan → Push → Apply → Deploy
+- Add new jobs: staging-terraform-apply and production-terraform-apply
+- Fix version output passing between restructured jobs
+- Prevent "MANIFEST_UNKNOWN" errors during container app deployment
+
 # [1.2.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.3...v1.2.0) (2025-07-30)
 
 

@@ -310,15 +310,6 @@ jobs:
           issue-title: "Approve Staging Terraform Apply"
           issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
 
-      - name: Terraform Apply
-        working-directory: ./terraform/terraform-staging
-        env:
-          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
-        run: terraform apply -auto-approve -input=false
-
   staging-build-backend:
     name: 'Staging Build Backend'
     runs-on: ubuntu-latest
@@ -446,13 +437,45 @@ jobs:
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-terraform.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest
 
+  staging-terraform-apply:
+    name: 'Staging Terraform Apply'
+    runs-on: ubuntu-latest
+    environment: staging
+    if: github.ref == 'refs/heads/develop'
+    needs:
+      - staging-push-images
+      - staging-terraform
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-staging
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ needs.staging-terraform.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ needs.staging-terraform.outputs.version }}
+        run: terraform apply -auto-approve -input=false
+
   staging-deploy:
     name: 'Staging Deploy'
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
     needs:
-      - staging-push-images
-      - staging-terraform
+      - staging-terraform-apply
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -572,15 +595,6 @@ jobs:
           minimum-approvals: 1
           issue-title: "Approve Production Terraform Apply"
           issue-body: "Please review the Terraform plan output and approve the infrastructure changes for production environment."
-
-      - name: Terraform Apply
-        working-directory: ./terraform/terraform-production
-        env:
-          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
-        run: terraform apply -auto-approve -input=false
 
   production-build-backend:
     name: 'Production Build Backend'
@@ -709,13 +723,45 @@ jobs:
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-terraform.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
 
+  production-terraform-apply:
+    name: 'Production Terraform Apply'
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - production-push-images
+      - production-terraform
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-production
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ needs.production-terraform.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ needs.production-terraform.outputs.version }}
+        run: terraform apply -auto-approve -input=false
+
   production-deploy:
     name: 'Production Deploy'
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     needs:
-      - production-push-images
-      - production-terraform
+      - production-terraform-apply
     steps:
       - name: Checkout
         uses: actions/checkout@v4

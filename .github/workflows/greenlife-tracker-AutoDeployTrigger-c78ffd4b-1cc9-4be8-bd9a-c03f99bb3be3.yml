@@ -5,7 +5,7 @@ on:
   # Automatically trigger it when detected changes in repo
   push:
     branches:
-      [ develop ]
+      - main
     paths:
     - '**'
     - '.github/workflows/greenlife-tracker-AutoDeployTrigger-c78ffd4b-1cc9-4be8-bd9a-c03f99bb3be3.yml'

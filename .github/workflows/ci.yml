@@ -78,11 +78,9 @@ jobs:
         run: bandit -r tracker config
 
       - name: Safety vulnerability check
-        working-directory: ./greenlife_backend
-        run: |
-          pip install safety
-          safety auth login --api-key ${{ secrets.SAFETY_API_KEY }}
-          safety scan --output text --full-report
+        uses: pyupio/safety-action@v1
+        with:
+          api-key: ${{ secrets.SAFETY_API_KEY }}
         continue-on-error: true
 
   backend-tests:

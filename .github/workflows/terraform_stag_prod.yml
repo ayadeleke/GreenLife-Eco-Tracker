@@ -113,7 +113,7 @@ jobs:
         run: bandit -r tracker config
       - name: Safety vulnerability check
         working-directory: ./greenlife_backend
-        run: safety scan --full-report
+        run: safety scan --full-report --key ${{ secrets.SAFETY_API_KEY }}
         continue-on-error: true
       - name: Pip-audit vulnerability check
         working-directory: ./greenlife_backend

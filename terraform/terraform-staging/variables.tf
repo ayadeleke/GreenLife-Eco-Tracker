@@ -86,3 +86,16 @@ variable "allowed_hosts" {
   type        = string
   default     = "localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io"
 }
+
+# Container Image Variables
+variable "backend_image_tag" {
+  description = "Backend container image tag"
+  type        = string
+  default     = "latest"
+}
+
+variable "frontend_image_tag" {
+  description = "Frontend container image tag"
+  type        = string
+  default     = "staging-latest"
+}

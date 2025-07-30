@@ -1,3 +1,4 @@
+does this wait for the release.yml to be completed before deploying in order to use the version:
 # This workflow installs the latest version of Terraform CLI and configures the Terraform CLI configuration file
 # with an API token for Terraform Cloud (app.terraform.io). On pull request events, this workflow will run
 # `terraform init`, `terraform fmt`, and `terraform plan` (speculative plan via Terraform Cloud). On push events
@@ -245,8 +246,15 @@ jobs:
       - name: Generate Version Tag
         id: version
         run: |
-          # Generate version based on date and run number for staging
-          VERSION="v$(date +'%Y.%m.%d')-staging.${GITHUB_RUN_NUMBER}"
+          # Get the latest semantic version from git tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || echo "v0.0.0")
+          echo "Latest semantic release tag: $LATEST_TAG"
+          
+          # Extract version number without 'v' prefix
+          BASE_VERSION=${LATEST_TAG#v}
+          
+          # Generate staging pre-release version
+          VERSION="${LATEST_TAG}-staging.${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated staging version: $VERSION"
       - name: Setup Terraform
@@ -402,13 +410,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate Version Tag
+      - name: Get Latest Release Version
         id: version
         run: |
-          # Generate version based on date and run number for production
-          VERSION="v$(date +'%Y.%m.%d').${GITHUB_RUN_NUMBER}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated production version: $VERSION"
+          # Get the latest semantic release version from GitHub releases API
+          LATEST_RELEASE=$(curl -s -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            jq -r '.tag_name // empty')
+          
+          if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" = "null" ]; then
+            # Fallback to git tags if no releases found
+            LATEST_RELEASE=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || echo "v1.0.0")
+            echo "No GitHub releases found, using git tag: $LATEST_RELEASE"
+          else
+            echo "Using GitHub release version: $LATEST_RELEASE"
+          fi
+          
+          echo "version=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          echo "Using production version: $LATEST_RELEASE"
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -522,7 +541,7 @@ jobs:
         run: |
           # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
-            --name greenlife-api-prod \
+            --name greenlife-api \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }} \
             --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
@@ -530,13 +549,13 @@ jobs:
             DEBUG="False"
           # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
-            --name greenlife-tracker-prod \
+            --name greenlife-tracker \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
-      - name: Create Git Tag for Production
+            
+      - name: Add Deployment Metadata to Release
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git tag -a "${{ steps.version.outputs.version }}" -m "Production deployment ${{ steps.version.outputs.version }}"
-          git push origin "${{ steps.version.outputs.version }}"
+          # Add deployment timestamp and metadata to the existing release
+          DEPLOY_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          echo "Deployment completed at: $DEPLOY_TIME for version: ${{ steps.version.outputs.version }}"

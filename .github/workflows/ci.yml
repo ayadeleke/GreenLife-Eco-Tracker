@@ -3,7 +3,6 @@ name: GreenLife_CI
 on:
   pull_request:
     branches:
-      - main
       - develop
   merge_group:
 

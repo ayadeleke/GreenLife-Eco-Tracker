@@ -1,5 +1,10 @@
 [![Board Status](https://dev.azure.com/ay-alu/8cf47f15-2421-4980-b11c-72f90ffcf768/7f38c7ff-5139-48fc-a054-589023b14ffe/_apis/work/boardbadge/7c9f1aa8-bd68-45be-8c08-ea13986638b4)](https://dev.azure.com/ay-alu/8cf47f15-2421-4980-b11c-72f90ffcf768/_boards/board/t/7f38c7ff-5139-48fc-a054-589023b14ffe/Microsoft.EpicCategory)
 
+## Video Demo link
+[Click to play video demo  ](https://screenrec.com/share/KHRofVeO7C)
+
+
+
 # GreenLife-Eco-Tracker  
 
 GreenLife Eco Tracker is a full-stack web application for tracking tree planting activities, visualizing environmental impact, and promoting biodiversity. The project features a Django REST API backend and a React/TypeScript frontend, with robust automated testing and CI/CD integration.

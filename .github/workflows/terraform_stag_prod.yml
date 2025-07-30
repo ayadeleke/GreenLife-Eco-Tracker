@@ -369,7 +369,7 @@ jobs:
         run: |
           # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
-            --name greenlife-api \
+            --name ${{ secrets.CONTAINERAPP_BACKEND_NAME_STAGING }} \
             --resource-group Greenlifebackend_group-a7e3 \
             --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ steps.version.outputs.version }} \
             --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
@@ -378,8 +378,8 @@ jobs:
           
           # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
-            --name greenlife-tracker \
-            --resource-group Greenlifefrontend_group \
+            --name ${{ secrets.CONTAINERAPP_FRONTEND_NAME_STAGING }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             --set-env-vars VITE_API_URL="https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
             
@@ -540,7 +540,7 @@ jobs:
         run: |
           # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
-            --name greenlife-api \
+            --name ${{ secrets.CONTAINERAPP_BACKEND_NAME_PRODUCTION }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }} \
             --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
@@ -548,7 +548,7 @@ jobs:
             DEBUG="False"
           # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
-            --name greenlife-tracker \
+            --name ${{ secrets.CONTAINERAPP_FRONTEND_NAME_PRODUCTION }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"

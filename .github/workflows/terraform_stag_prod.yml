@@ -268,6 +268,8 @@ jobs:
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform plan -input=false
 
       - name: Request Approval for Staging Deployment
@@ -302,6 +304,8 @@ jobs:
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform apply -auto-approve -input=false
 
       - name: Log in to Azure Container Registry
@@ -427,6 +431,8 @@ jobs:
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform plan -input=false
 
       - name: Request Approval for Production Deployment
@@ -461,6 +467,8 @@ jobs:
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
         run: terraform apply -auto-approve -input=false
 
       - name: Log in to Azure Container Registry

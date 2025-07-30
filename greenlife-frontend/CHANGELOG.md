@@ -1,3 +1,11 @@
+## [2.0.1](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v2.0.0...v2.0.1) (2025-07-30)
+
+
+### Bug Fixes
+
+* allowing the workflow to get the tag from the main origin ([6009ebf](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/6009ebf2b1bba8bb556524bedb2928ed87069714))
+* resolve security vulnerabilities and update CI/CD pipeline dependencies ([ad11765](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/ad11765674e347b5d4509d2669dee58780e8a226))
+
 # [2.0.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.2.0...v2.0.0) (2025-07-30)
 
 

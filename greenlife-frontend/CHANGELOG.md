@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.2...v1.1.3) (2025-07-30)
+
+
+### Bug Fixes
+
+* resolve error with CI/CD pipeline running ([4532375](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/453237507d232e9f59eeec5e18d0b6d913e29523))
+
 ## [1.1.2](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.1...v1.1.2) (2025-07-30)
 
 

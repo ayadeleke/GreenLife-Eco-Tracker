@@ -249,7 +249,6 @@ jobs:
           VERSION="v$(date +'%Y.%m.%d')-staging.${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated staging version: $VERSION"
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -299,15 +298,6 @@ jobs:
           issue-title: "Approve Staging Terraform Apply"
           issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
 
-      - name: Terraform Apply
-        working-directory: ./terraform/terraform-staging
-        env:
-          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
-        run: terraform apply -auto-approve -input=false
-
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
         with:
@@ -352,6 +342,15 @@ jobs:
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest
 
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-staging
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
+        run: terraform apply -auto-approve -input=false
+
       - name: Azure Login (OIDC)
         uses: azure/login@v1
         with:
@@ -383,8 +382,6 @@ jobs:
           git config --local user.name "GitHub Action"
           git tag -a "${{ steps.version.outputs.version }}" -m "Staging deployment ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
-
-
   production:
     name: 'Production Deploy'
     runs-on: ubuntu-latest
@@ -412,7 +409,6 @@ jobs:
           VERSION="v$(date +'%Y.%m.%d').${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated production version: $VERSION"
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -459,17 +455,8 @@ jobs:
           secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
           approvers: ayadeleke
           minimum-approvals: 1
-          issue-title: "Approve Staging Terraform Apply"
-          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
-
-      - name: Terraform Apply
-        working-directory: ./terraform/terraform-production
-        env:
-          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
-        run: terraform apply -auto-approve -input=false
+          issue-title: "Approve Production Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for production environment."
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
@@ -500,7 +487,6 @@ jobs:
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
-
       - name: Build Frontend Image
         run: |
           docker build --build-arg VITE_API_URL=https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api \
@@ -515,6 +501,15 @@ jobs:
         run: |
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
+
+      - name: Terraform Apply
+        working-directory: ./terraform/terraform-production
+        env:
+          TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_backend_image_tag: ${{ steps.version.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ steps.version.outputs.version }}
+        run: terraform apply -auto-approve -input=false
 
       - name: Azure Login (OIDC)
         uses: azure/login@v1
@@ -533,18 +528,15 @@ jobs:
             --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
             DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
             DEBUG="False"
-
           # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
             --name greenlife-tracker \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
             --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
-
       - name: Create Git Tag for Production
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git tag -a "${{ steps.version.outputs.version }}" -m "Production deployment ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
-

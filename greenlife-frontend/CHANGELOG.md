@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.0.0...v1.1.0) (2025-07-30)
+
+
+### Features
+
+* Separate Staging and Production Environment resources ([df1559e](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/df1559e8df57b3f5c385733f2e90fcc23b744ffd))
+
 # 1.0.0 (2025-07-30)
 
 

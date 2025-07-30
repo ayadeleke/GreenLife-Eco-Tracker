@@ -115,7 +115,7 @@ module "container_apps" {
 
   # Backend App Configuration
   backend_app_name = "greenlife-api"
-  backend_image    = "${module.container_registry.login_server}/greenlife-backend:latest"
+  backend_image    = "${module.container_registry.login_server}/greenlife-backend:${var.backend_image_tag}"
   backend_env_vars = {
     DB_HOST           = var.db_host
     DB_NAME           = var.db_name
@@ -130,7 +130,7 @@ module "container_apps" {
 
   # Frontend App Configuration
   frontend_app_name = "greenlife-tracker"
-  frontend_image    = "${module.container_registry.login_server}/greenlife-frontend:staging-latest"
+  frontend_image    = "${module.container_registry.login_server}/greenlife-frontend:${var.frontend_image_tag}"
   frontend_env_vars = {
     VITE_API_URL = "https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
   }

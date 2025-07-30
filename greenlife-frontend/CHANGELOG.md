@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.1...v1.1.2) (2025-07-30)
+
+
+### Bug Fixes
+
+* **CI/CD Version:** fix versioning logic to correctly read latest release tag ([3aeb0ad](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/3aeb0ad9ab67c3b4c6d14d5540cff2a3f098a463))
+
 ## [1.1.1](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.0...v1.1.1) (2025-07-30)
 
 

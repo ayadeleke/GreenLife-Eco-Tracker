@@ -79,7 +79,7 @@ jobs:
 
       - name: Safety vulnerability check
         working-directory: ./greenlife_backend
-        run: safety scan --full-report
+        run: safety scan --full-report --key ${{ secrets.SAFETY_API_KEY }}
         continue-on-error: true
 
   backend-tests:

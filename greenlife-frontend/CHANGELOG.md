@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.3...v1.2.0) (2025-07-30)
+
+
+### Features
+
+* restructure CI/CD pipeline with proper job dependencies and parallel execution ([0f3832a](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/0f3832a19d956018354550ffc0f0ac3516bec1b7))
+
 ## [1.1.3](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v1.1.2...v1.1.3) (2025-07-30)
 
 

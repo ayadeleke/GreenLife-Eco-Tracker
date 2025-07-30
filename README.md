@@ -207,6 +207,142 @@ docker ps
 
 ---
 
+## Automated CI/CD Pipeline Process
+
+This project implements a comprehensive automated CI/CD pipeline that ensures code quality, security, and reliable deployments across staging and production environments. The automation process is defined in `.github/workflows/terraform_stag_prod.yml` and follows these stages:
+
+### Quality Assurance Stage
+
+**Backend Quality Checks:**
+- **Linting**: Automated code style checking using `flake8`
+- **Formatting**: Code formatting validation with `black`
+- **Unit Testing**: Comprehensive Django test suite with MySQL service container
+- **Database Migration**: Automated schema validation and migration testing
+
+**Frontend Quality Checks:**
+- **Linting**: ESLint validation with zero-warning tolerance
+- **Unit Testing**: React/TypeScript test suite execution
+- **Dependency Validation**: Node.js dependency integrity checks
+
+### Security Stage
+
+**Vulnerability Scanning:**
+- **Static Code Analysis**: `bandit` security scan for Python code vulnerabilities
+- **Dependency Auditing**: `pip-audit` for known security vulnerabilities in dependencies
+- **Safety Checks**: PyUp Safety integration for additional vulnerability detection
+
+### Infrastructure Validation
+
+**Terraform Validation:**
+- **Format Checking**: Automated Terraform code formatting validation
+- **Configuration Validation**: Terraform plan validation without execution
+- **Security Scanning**: `tfsec` security analysis for infrastructure as code
+- **Terraform Cloud Integration**: Remote state management and workspace validation
+
+### Staging Environment Automation
+
+**Triggered on:** Pushes to `develop` branch
+
+**Version Management:**
+- Automated semantic version generation with staging suffix (e.g., `v1.2.3-staging.456`)
+- Git tag fetching and version precedence handling
+
+**Infrastructure Deployment:**
+- **Manual Approval Gate**: GitHub Actions manual approval requirement for infrastructure changes
+- **Terraform Apply**: Automated infrastructure provisioning in staging environment
+- **Azure Container Registry**: Automated container image building and pushing
+
+**Container Security:**
+- **Trivy Scanning**: Critical vulnerability scanning for Docker images
+- **Multi-tag Strategy**: Version-specific and latest tag management
+
+**Application Deployment:**
+- **Azure Container Apps**: Automated container app updates with new images
+- **Environment Configuration**: Staging-specific environment variables injection
+- **DNS and Networking**: Automated service endpoint configuration
+
+### 🏭 Production Environment Automation
+
+**Triggered on:** Pushes to `main` branch
+
+**Release Management:**
+- GitHub Releases API integration for version determination
+- Fallback version strategy using Git tags
+- Production-grade version tagging
+
+**Enhanced Security:**
+- **Production Approval Gate**: Mandatory manual approval for production deployments
+- **Enhanced Scanning**: Additional security validation for production images
+- **Critical Vulnerability Blocking**: Automated deployment blocking on critical security issues
+
+**Blue-Green Deployment Strategy:**
+- **Container Registry**: Separate production Azure Container Registry
+- **Environment Isolation**: Complete separation of staging and production resources
+- **Configuration Management**: Production-specific environment variables and secrets
+
+### 🔧 Automation Features
+
+**GitHub Actions Integration:**
+- **OIDC Authentication**: Secure Azure authentication without stored credentials
+- **Environment Protection**: GitHub environment protection rules for staging and production
+- **Parallel Execution**: Optimized pipeline execution with parallel job processing
+- **Failure Handling**: Comprehensive error handling and rollback strategies
+
+**Monitoring and Notifications:**
+- **Deployment Status**: Automated GitHub issue/PR commenting for deployment status
+- **Git Tagging**: Automated version tagging for successful deployments
+- **Deployment Metadata**: Timestamp and version tracking for releases
+
+**Infrastructure as Code:**
+- **Multi-Environment Support**: Separate Terraform configurations for staging and production
+- **State Management**: Terraform Cloud backend for secure state management
+- **Variable Management**: Environment-specific variable injection and secret handling
+
+### 📊 Pipeline Stages Overview
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Code Quality  │ -> │    Security     │ -> │ Infrastructure  │
+│                 │    │                 │    │   Validation    │
+│ • Backend Lint  │    │ • Bandit Scan   │    │ • Terraform     │
+│ • Frontend Lint │    │ • Pip Audit     │    │   Format Check  │
+│ • Unit Tests    │    │ • Safety Check  │    │ • Plan          │
+│ • Formatting    │    │                 │    │ • tfsec Scan    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+           │                       │                       │
+           v                       v                       v
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Staging Build  │    │ Production Build│    │   Deployment    │
+│                 │    │                 │    │                 │
+│ • Version Gen   │    │ • Release Ver   │    │ • Manual        │
+│ • Image Build   │    │ • Image Build   │    │   Approval      │
+│ • Trivy Scan    │    │ • Trivy Scan    │    │ • Terraform     │
+│ • ACR Push      │    │ • ACR Push      │    │   Apply         │
+└─────────────────┘    └─────────────────┘    │ • Container     │
+           │                       │           │   App Update    │
+           v                       v           └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│ Staging Deploy  │    │Production Deploy│
+│                 │    │                 │
+│ • Auto Deploy   │    │ • Manual Gate   │
+│ • Container     │    │ • Container     │
+│   App Update    │    │   App Update    │
+│ • Git Tagging   │    │ • Release Meta  │
+└─────────────────┘    └─────────────────┘
+```
+
+### 🔑 Key Automation Benefits
+
+- **Zero-Downtime Deployments**: Container-based deployments with rolling updates
+- **Security-First Approach**: Multiple security scanning layers prevent vulnerable code deployment
+- **Environment Parity**: Consistent deployment process across staging and production
+- **Audit Trail**: Complete deployment history with Git tags and release metadata
+- **Developer Experience**: Automated feedback through PR comments and status checks
+- **Compliance**: Manual approval gates for production changes ensure governance
+
+This automation pipeline ensures that every code change goes through rigorous quality checks, security validation, and controlled deployment processes, maintaining high reliability and security standards across all environments.
+
+
 ## 📋 Project Management
 
 - [Azure Project Board](https://dev.azure.com/ay-alu/GreenLife%20Eco%20Tracker/_boards/board/t/GreenLife%20Eco%20Tracker%20Team/Epics)  

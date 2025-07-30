@@ -96,31 +96,35 @@ jobs:
   backend-security:
     name: Backend Security
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install security tools
         working-directory: ./greenlife_backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install bandit safety pip-audit
+          pip install bandit pip-audit
+
       - name: Bandit security scan
         working-directory: ./greenlife_backend
         run: bandit -r tracker config
-      - name: Safety vulnerability check
-        working-directory: ./greenlife_backend
-        run: |
-          pip install safety
-          safety auth login --api-key ${{ secrets.SAFETY_API_KEY }}
-          safety scan --output text --full-report
-        continue-on-error: true
+
       - name: Pip-audit vulnerability check
         working-directory: ./greenlife_backend
         run: pip-audit
+        continue-on-error: true
+
+      - name: Safety vulnerability check
+        uses: pyupio/safety-action@v1
+        with:
+          api-key: ${{ secrets.SAFETY_API_KEY }}
         continue-on-error: true
 
   backend-tests:

@@ -1,3 +1,15 @@
+## [2.0.2](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v2.0.1...v2.0.2) (2025-07-30)
+
+
+### Bug Fixes
+
+* update curent year ([24b2ec6](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/24b2ec6e03a0efad0c11e7859c2aee8bc0529531))
+* update curent year ([6af784b](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/6af784bf64761a8884a8d773c6ec75906fa6590e))
+* update current year ([ffe5c66](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/ffe5c660df46c6095a27ab56b5b67ba20078850a))
+* update current year ([844742a](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/844742a1b9fab5f734799af54ea5fea0422afaf0))
+* update the current year ([6c2e370](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/6c2e3701a28cce35a2d7de580fc0c4efaffb9ccd))
+* update the current year to 2026 ([35adee4](https://github.com/ayadeleke/GreenLife-Eco-Tracker/commit/35adee49391f8b8f198d62de250d8e15a870d76a))
+
 ## [2.0.1](https://github.com/ayadeleke/GreenLife-Eco-Tracker/compare/v2.0.0...v2.0.1) (2025-07-30)
 
 

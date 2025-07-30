@@ -191,9 +191,9 @@ docker ps
 ---
 
 ## Screenshots
-![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/project%20front.png?raw=true)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/9d0c2f087581f2a89f61b9bec3e1e3e2bc3db95a/screenshots/project%20front.png)
 
-![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/project_documentation/screenshots/project%20back.png?raw=true)
+![image](https://github.com/ayadeleke/GreenLife-Eco-Tracker/blob/9d0c2f087581f2a89f61b9bec3e1e3e2bc3db95a/screenshots/project%20back.png)
 
 ---
 

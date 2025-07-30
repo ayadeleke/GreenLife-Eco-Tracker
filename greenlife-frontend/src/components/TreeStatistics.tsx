@@ -315,7 +315,7 @@ const TreeStatistics: React.FC<TreeStatisticsProps> = ({ onSpeciesSelect }) => {
                                         color: "info.main",
                                     }}
                                 >
-                                    2026
+                                    2025
                                 </Typography>
                                 <Typography
                                     variant="body2"

@@ -14,7 +14,7 @@ env:
   - name: DURATION
     value: "300"
   - name: ENABLE_LOGGING
-    value: "False"
+    value: "True"
 
 # Load test configuration for Locust
 configurationFiles:
@@ -24,7 +24,20 @@ configurationFiles:
 autoStop:
   errorRate:
     percentage: 90
+    timeWindow: 60
   responseTimeMs:
+    value: 10000
+    timeWindow: 60
+
+# Test settings
+failureCriteria:
+  - aggregate: "percentage"
+    metric: "error"
+    operator: ">"
+    value: 50
+  - aggregate: "avg"
+    metric: "response_time_ms"
+    operator: ">"
     value: 5000
 
 # Split traffic configuration
@@ -34,3 +47,7 @@ splitTraffic:
 # Monitoring configuration
 monitoring:
   resourceIds: []
+
+# Additional properties
+properties:
+  userPropertyAsString: "sample_property"

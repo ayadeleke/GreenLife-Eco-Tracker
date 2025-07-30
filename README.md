@@ -2,6 +2,8 @@
 
 ## Video Demo link
 [Click to play video demo  ](https://screenrec.com/share/KHRofVeO7C)
+## OR Via 
+[Youtube](https://youtu.be/l5yvJhNDMJA)
 
 
 

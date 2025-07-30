@@ -61,6 +61,24 @@ jobs:
           echo "HOST=https://greengoal.azurewebsites.net" >> $GITHUB_ENV
         fi
 
+    - name: Test target URL accessibility
+      shell: bash
+      run: |
+        echo "Testing target URL accessibility: $HOST"
+        
+        # Test with curl first
+        if curl -f -s --max-time 30 "$HOST" > /dev/null; then
+          echo "✅ Target URL is accessible with curl"
+        else
+          echo "❌ Target URL is not accessible with curl"
+          echo "Attempting to get more details..."
+          curl -v --max-time 30 "$HOST" || true
+        fi
+        
+        # Test with Python script for more detailed analysis
+        cd load_tests
+        python test_connectivity.py "$HOST"
+
     - name: Run Azure Load Test
       shell: bash
       run: |
@@ -70,6 +88,11 @@ jobs:
 
         if [[ ! -f locustfile.py ]]; then
           echo "ERROR: locustfile.py not found in load_tests/"
+          exit 1
+        fi
+        
+        if [[ ! -f simple_locustfile.py ]]; then
+          echo "ERROR: simple_locustfile.py not found in load_tests/"
           exit 1
         fi
 
@@ -94,6 +117,7 @@ jobs:
           --env TARGET_URL="$HOST" \
           --env USERS="$USERS" \
           --env DURATION="$DURATION" \
+          --env ENABLE_LOGGING="True" \
           --description "Automated load test from GitHub Actions for $ENVIRONMENT environment" || { echo "Failed to create load test"; exit 1; }
 
         echo "TEST_ID=$TEST_ID" >> $GITHUB_ENV
@@ -112,23 +136,38 @@ jobs:
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "Test run started with ID: $RUN_ID"
 
-        echo "Waiting for test completion (up to 10 minutes)..."
+        echo "Waiting for test completion (up to 15 minutes)..."
 
         set +e  # Allow loop to handle timeout itself
 
-        timeout 600 bash -c "
-          while [[ \$(az load test-run show \
-            --test-run-id $RUN_ID \
-            --resource-group $RESOURCE_GROUP \
-            --load-test-resource $LOAD_TEST_RESOURCE \
-            --query 'status' -o tsv) != 'DONE' ]]; do
-              STATUS=\$(az load test-run show \
+        timeout 900 bash -c "
+          while true; do
+            STATUS=\$(az load test-run show \
+              --test-run-id $RUN_ID \
+              --resource-group $RESOURCE_GROUP \
+              --load-test-resource $LOAD_TEST_RESOURCE \
+              --query 'status' -o tsv)
+            
+            echo \"Test status: \$STATUS. Time: \$(date)\"
+            
+            if [[ \"\$STATUS\" == \"DONE\" ]]; then
+              echo \"Test completed successfully.\"
+              break
+            elif [[ \"\$STATUS\" == \"FAILED\" ]]; then
+              echo \"ERROR: Test execution failed.\"
+              echo \"Getting detailed test information...\"
+              az load test-run show \
                 --test-run-id $RUN_ID \
                 --resource-group $RESOURCE_GROUP \
-                --load-test-resource $LOAD_TEST_RESOURCE \
-                --query 'status' -o tsv)
-              echo \"Test status: \$STATUS. Waiting 30s...\"
+                --load-test-resource $LOAD_TEST_RESOURCE
+              exit 1
+            elif [[ \"\$STATUS\" == \"CANCELLED\" ]]; then
+              echo \"ERROR: Test was cancelled.\"
+              exit 1
+            else
+              echo \"Waiting 30s...\"
               sleep 30
+            fi
           done
         "
 
@@ -136,27 +175,78 @@ jobs:
         set -e
 
         if [[ $EXIT_CODE -eq 124 ]]; then
-          echo "ERROR: Test timed out waiting for completion after 10 minutes."
-          # Optional: get test run final status and logs here
+          echo "ERROR: Test timed out waiting for completion after 15 minutes."
+          # Get test run final status and logs
+          echo "Getting final test status..."
           az load test-run show --test-run-id $RUN_ID --resource-group $RESOURCE_GROUP --load-test-resource $LOAD_TEST_RESOURCE
           exit 1
+        elif [[ $EXIT_CODE -ne 0 ]]; then
+          echo "ERROR: Test failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
         else
           echo "Test completed successfully."
         fi
 
-    - name: Download Test Results
+    - name: Get detailed test failure information
+      if: failure()
       shell: bash
       run: |
-        az load test-run download-files \
-          --test-run-id "$RUN_ID" \
-          --resource-group "$RESOURCE_GROUP" \
-          --load-test-resource "$LOAD_TEST_RESOURCE" \
-          --path ./test-results
+        echo "Getting detailed information about the failed test..."
+        if [[ -n "$RUN_ID" ]]; then
+          echo "Test Run Details:"
+          az load test-run show \
+            --test-run-id "$RUN_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" || true
+            
+          echo "Attempting to download any available logs..."
+          az load test-run download-files \
+            --test-run-id "$RUN_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" \
+            --path ./failed-test-results || true
+            
+          echo "Listing downloaded files:"
+          ls -la ./failed-test-results/ || true
+          
+          echo "Looking for log files:"
+          find ./failed-test-results/ -name "*.log" -o -name "*.txt" | head -10 | while read file; do
+            echo "=== $file ==="
+            cat "$file" || true
+            echo ""
+          done
+        else
+          echo "RUN_ID not available, cannot get detailed test information"
+        fi
+
+    - name: Download Test Results
+      if: always()
+      shell: bash
+      run: |
+        if [[ -n "$RUN_ID" ]]; then
+          echo "Downloading test results for run: $RUN_ID"
+          az load test-run download-files \
+            --test-run-id "$RUN_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --load-test-resource "$LOAD_TEST_RESOURCE" \
+            --path ./test-results || {
+              echo "Failed to download test results, but continuing..."
+            }
+          
+          echo "Downloaded files:"
+          ls -la ./test-results/ || echo "No test results directory found"
+        else
+          echo "RUN_ID not available, cannot download test results"
+        fi
 
     - name: Upload Azure Load Test Results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: azure-load-test-results-${{ env.ENVIRONMENT }}
+        name: azure-load-test-results-${{ github.ref_name }}
         path: |
           ./test-results/
+          ./failed-test-results/
           load_tests/locustfile.py
+          load_tests/simple_locustfile.py
+          load_tests/test_connectivity.py

@@ -1,4 +1,48 @@
-name: 'Terraform CI/CD'
+# This workflow installs the latest version of Terraform CLI and configures the Terraform CLI configuration file
+# with an API token for Terraform Cloud (app.terraform.io). On pull request events, this workflow will run
+# `terraform init`, `terraform fmt`, and `terraform plan` (speculative plan via Terraform Cloud). On push events
+# to the "main" branch, `terraform apply` will be executed.
+#
+# Documentation for `hashicorp/setup-terraform` is located here: https://github.com/hashicorp/setup-terraform
+#
+# To use this workflow, you will need to complete the following setup steps.
+#
+# 1. Create a `main.tf` file in the root of this repository with the `remote` backend and one or more resources defined.
+#   Example `main.tf`:
+#     # The configuration for the `remote` backend.
+#     terraform {
+#       backend "remote" {
+#         # The name of your Terraform Cloud organization.
+#         organization = "example-organization"
+#
+#         # The name of the Terraform Cloud workspace to store Terraform state files in.
+#         workspaces {
+#           name = "example-workspace"
+#         }
+#       }
+#     }
+#
+#     # An example resource that does nothing.
+#     resource "null_resource" "example" {
+#       triggers = {
+#         value = "A example resource that does nothing!"
+#       }
+#     }
+#
+#
+# 2. Generate a Terraform Cloud user API token and store it as a GitHub secret (e.g. TF_API_TOKEN) on this repository.
+#   Documentation:
+#     - https://www.terraform.io/docs/cloud/users-teams-organizations/api-tokens.html
+#     - https://help.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets
+#
+# 3. Reference the GitHub secret in step using the `hashicorp/setup-terraform` GitHub Action.
+#   Example:
+#     - name: Setup Terraform
+#       uses: hashicorp/setup-terraform@v1
+#       with:
+#         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+name: 'Terraform'
 
 on:
   push:
@@ -11,7 +55,6 @@ permissions:
   contents: write
 
 jobs:
-  # Validation and Testing Jobs
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
@@ -186,16 +229,17 @@ jobs:
         run: |
           curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
           tfsec ./terraform/terraform-web --soft-fail
-
-  # Staging Environment Jobs
-  staging-terraform:
-    name: 'Staging Terraform'
+  staging-build:
+    name: 'Staging Build & Security Scan'
     runs-on: ubuntu-latest
     environment: staging
     if: github.ref == 'refs/heads/develop'
     needs: terraform-validate
     outputs:
       version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -203,9 +247,17 @@ jobs:
       - name: Generate Version Tag
         id: version
         run: |
+          # Get the latest semantic version from git tags
           LATEST_TAG=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || echo "v0.0.0")
+          echo "Latest semantic release tag: $LATEST_TAG"
+          
+          # Extract version number without 'v' prefix
+          BASE_VERSION=${LATEST_TAG#v}
+          
+          # Generate staging pre-release version
           VERSION="${LATEST_TAG}-staging.${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated staging version: $VERSION"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -216,7 +268,7 @@ jobs:
         working-directory: ./terraform/terraform-staging
         run: terraform init
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         working-directory: ./terraform/terraform-staging
         run: terraform fmt -check
 
@@ -254,22 +306,8 @@ jobs:
           secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
           approvers: ayadeleke
           minimum-approvals: 1
-
-  staging-build-images:
-    name: 'Staging Build Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    needs: staging-terraform
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          issue-title: "Approve Staging Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for staging environment."
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
@@ -280,80 +318,53 @@ jobs:
 
       - name: Build Backend Image
         run: |
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ needs.staging-terraform.outputs.version }} \
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ steps.version.outputs.version }} \
                        -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest ./greenlife_backend
 
       - name: Build Frontend Image
         run: |
           docker build --build-arg VITE_API_URL=https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api \
-            -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-terraform.outputs.version }} \
+            -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             -t ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest ./greenlife-frontend
 
-  staging-scan-images:
-    name: 'Staging Scan Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    needs: staging-build-images
-    steps:
       - name: Install Trivy
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
           sudo apt-get update
-          sudo apt-get install -y trivy
+          sudo apt-get install trivy
 
-      - name: Scan Backend Image
+      - name: Scan Backend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ needs.staging-terraform.outputs.version }}
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ steps.version.outputs.version }}
         continue-on-error: true
 
-      - name: Scan Frontend Image
+      - name: Scan Frontend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-terraform.outputs.version }}
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ steps.version.outputs.version }}
         continue-on-error: true
-
-  staging-push-images:
-    name: 'Staging Push Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    needs:
-      - staging-scan-images
-      - staging-terraform
-    steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.ACR_LOGIN_SERVER_STAGING }}
-          username: ${{ secrets.ACR_USERNAME_STAGING }}
-          password: ${{ secrets.ACR_PASSWORD_STAGING }}
 
       - name: Push Backend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ needs.staging-terraform.outputs.version }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:latest
 
       - name: Push Frontend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-terraform.outputs.version }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:staging-latest
 
-  staging-terraform-apply:
-    name: 'Staging Terraform Apply'
+  staging-deploy:
+    name: 'Staging Deploy'
     runs-on: ubuntu-latest
     environment: staging
     if: github.ref == 'refs/heads/develop'
-    needs:
-      - staging-push-images
-      - staging-terraform
+    needs: staging-build
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -363,23 +374,18 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
 
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-staging
+        run: terraform init
+
       - name: Terraform Apply
         working-directory: ./terraform/terraform-staging
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ needs.staging-terraform.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ needs.staging-terraform.outputs.version }}
+          TF_VAR_backend_image_tag: ${{ needs.staging-build.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ needs.staging-build.outputs.version }}
         run: terraform apply -auto-approve -input=false
-
-  staging-deploy:
-    name: 'Staging Deploy'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    needs: staging-terraform-apply
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
       - name: Azure Login (OIDC)
         uses: azure/login@v1
@@ -388,40 +394,41 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Update Container Apps
+      - name: Update Container App Images (Staging)
         run: |
-          # Update backend container app
+          # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
             --name ${{ secrets.CONTAINERAPP_BACKEND_NAME_STAGING }} \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ needs.staging-terraform.outputs.version }} \
-            --set-env-vars ALLOWED_HOSTS="${{ secrets.ALLOWED_HOSTS_STAGING }}" \
+            --resource-group Greenlifebackend_group-a7e3 \
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-backend:${{ needs.staging-build.outputs.version }} \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
             DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
             DEBUG="False"
           
-          # Update frontend container app
+          # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
             --name ${{ secrets.CONTAINERAPP_FRONTEND_NAME_STAGING }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_STAGING }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-terraform.outputs.version }} \
-            --set-env-vars VITE_API_URL="${{ secrets.VITE_API_URL_STAGING }}"
-
-      - name: Create Git Tag
+            --image ${{ secrets.ACR_LOGIN_SERVER_STAGING }}/greenlife-frontend:${{ needs.staging-build.outputs.version }} \
+            --set-env-vars VITE_API_URL="https://greenlife-api.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
+            
+      - name: Create Git Tag for Staging
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag -a "${{ needs.staging-terraform.outputs.version }}" -m "Staging deployment"
-          git push origin "${{ needs.staging-terraform.outputs.version }}"
-
-  # Production Environment Jobs
-  production-terraform:
-    name: 'Production Terraform'
+          git tag -a "${{ needs.staging-build.outputs.version }}" -m "Staging deployment ${{ needs.staging-build.outputs.version }}"
+          git push origin "${{ needs.staging-build.outputs.version }}"
+  production-build:
+    name: 'Production Build & Security Scan'
     runs-on: ubuntu-latest
     environment: production
     if: github.ref == 'refs/heads/main'
     needs: terraform-validate
     outputs:
       version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -429,13 +436,21 @@ jobs:
       - name: Get Latest Release Version
         id: version
         run: |
+          # Get the latest semantic release version from GitHub releases API
           LATEST_RELEASE=$(curl -s -H "Authorization: token ${{ secrets.GH_PAT }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
             jq -r '.tag_name // empty')
-          if [ -z "$LATEST_RELEASE" ]; then
+          
+          if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" = "null" ]; then
+            # Fallback to git tags if no releases found
             LATEST_RELEASE=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || echo "v1.0.0")
+            echo "No GitHub releases found, using git tag: $LATEST_RELEASE"
+          else
+            echo "Using GitHub release version: $LATEST_RELEASE"
           fi
+          
           echo "version=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          echo "Using production version: $LATEST_RELEASE"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -446,7 +461,7 @@ jobs:
         working-directory: ./terraform/terraform-production
         run: terraform init
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         working-directory: ./terraform/terraform-production
         run: terraform fmt -check
 
@@ -478,28 +493,14 @@ jobs:
               });
             }
 
-      - name: Wait for Approval
+      - name: Wait for Production Approval
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.MANUAL_APPROVAL_TOKEN }}
           approvers: ayadeleke
           minimum-approvals: 1
-
-  production-build-images:
-    name: 'Production Build Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: production-terraform
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          issue-title: "Approve Production Terraform Apply"
+          issue-body: "Please review the Terraform plan output and approve the infrastructure changes for production environment."
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
@@ -510,80 +511,53 @@ jobs:
 
       - name: Build Backend Image
         run: |
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ needs.production-terraform.outputs.version }} \
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }} \
                        -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest ./greenlife_backend
 
       - name: Build Frontend Image
         run: |
           docker build --build-arg VITE_API_URL=https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api \
-            -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-terraform.outputs.version }} \
+            -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }} \
             -t ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest ./greenlife-frontend
 
-  production-scan-images:
-    name: 'Production Scan Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: production-build-images
-    steps:
       - name: Install Trivy
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
           sudo apt-get update
-          sudo apt-get install -y trivy
+          sudo apt-get install trivy
 
-      - name: Scan Backend Image
+      - name: Scan Backend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ needs.production-terraform.outputs.version }}
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }}
         continue-on-error: true
 
-      - name: Scan Frontend Image
+      - name: Scan Frontend Docker Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-terraform.outputs.version }}
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }}
         continue-on-error: true
-
-  production-push-images:
-    name: 'Production Push Images'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs:
-      - production-scan-images
-      - production-terraform
-    steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}
-          username: ${{ secrets.ACR_USERNAME_PRODUCTION }}
-          password: ${{ secrets.ACR_PASSWORD_PRODUCTION }}
 
       - name: Push Backend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ needs.production-terraform.outputs.version }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:latest
 
       - name: Push Frontend Image
         run: |
-          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-terraform.outputs.version }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ steps.version.outputs.version }}
           docker push ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:latest
 
-  production-terraform-apply:
-    name: 'Production Terraform Apply'
+  production-deploy:
+    name: 'Production Deploy'
     runs-on: ubuntu-latest
     environment: production
     if: github.ref == 'refs/heads/main'
-    needs:
-      - production-push-images
-      - production-terraform
+    needs: production-build
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -593,23 +567,18 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TERRAFORM_CLOUD_TOKEN }}
 
+      - name: Terraform Init
+        working-directory: ./terraform/terraform-production
+        run: terraform init
+
       - name: Terraform Apply
         working-directory: ./terraform/terraform-production
         env:
           TF_VAR_django_secret_key: ${{ secrets.DJANGO_SECRET_KEY }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_backend_image_tag: ${{ needs.production-terraform.outputs.version }}
-          TF_VAR_frontend_image_tag: ${{ needs.production-terraform.outputs.version }}
+          TF_VAR_backend_image_tag: ${{ needs.production-build.outputs.version }}
+          TF_VAR_frontend_image_tag: ${{ needs.production-build.outputs.version }}
         run: terraform apply -auto-approve -input=false
-
-  production-deploy:
-    name: 'Production Deploy'
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: production-terraform-apply
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
       - name: Azure Login (OIDC)
         uses: azure/login@v1
@@ -618,25 +587,25 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Update Container Apps
+      - name: Update Container App Images (Production)
         run: |
-          # Update backend container app
+          # Update backend container app with new image and ensure all environment variables are set
           az containerapp update \
             --name ${{ secrets.CONTAINERAPP_BACKEND_NAME_PRODUCTION }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ needs.production-terraform.outputs.version }} \
-            --set-env-vars ALLOWED_HOSTS="${{ secrets.ALLOWED_HOSTS_PRODUCTION }}" \
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-backend:${{ needs.production-build.outputs.version }} \
+            --set-env-vars ALLOWED_HOSTS="localhost,127.0.0.1,greenlife-tracker-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-tracker.greenplant-30488afa.southcentralus.azurecontainerapps.io,greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io" \
             DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}" \
             DEBUG="False"
-          
-          # Update frontend container app
+          # Update frontend container app with new image and ensure API URL is set
           az containerapp update \
             --name ${{ secrets.CONTAINERAPP_FRONTEND_NAME_PRODUCTION }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_FRONTEND_PRODUCTION }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-terraform.outputs.version }} \
-            --set-env-vars VITE_API_URL="${{ secrets.VITE_API_URL_PRODUCTION }}"
-
-      - name: Add Deployment Metadata
+            --image ${{ secrets.ACR_LOGIN_SERVER_PRODUCTION }}/greenlife-frontend:${{ needs.production-build.outputs.version }} \
+            --set-env-vars VITE_API_URL="https://greenlife-api-prod.greenplant-30488afa.southcentralus.azurecontainerapps.io/api"
+            
+      - name: Add Deployment Metadata to Release
         run: |
+          # Add deployment timestamp and metadata to the existing release
           DEPLOY_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          echo "Deployed version ${{ needs.production-terraform.outputs.version }} at $DEPLOY_TIME"
+          echo "Deployment completed at: $DEPLOY_TIME for version: ${{ needs.production-build.outputs.version }}"
